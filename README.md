@@ -105,20 +105,22 @@ La app principal esta en:
 app.py
 ```
 
-### Inicializar Google Sheet backend
+### Inicializar Supabase
 
-1. Crea una Service Account en Google Cloud.
-2. Comparte el Google Sheet backend con el correo de la Service Account como `Editor`.
-3. Ejecuta:
+1. Crea un proyecto en Supabase.
+2. Ve a `SQL Editor`.
+3. Copia y ejecuta el contenido de `supabase/schema.sql`.
+4. En `Project Settings > API`, copia `Project URL` y `service_role key`.
+5. Inicializa datos base:
 
 ```powershell
-python scripts\init_app_sheets.py --spreadsheet-id "ID_DEL_GOOGLE_SHEET_BACKEND" --service-account-json "ruta\service-account.json" --default-pin "1234" --admin-pin "admin123"
+python scripts\init_supabase.py --url "SUPABASE_URL" --service-role-key "SUPABASE_SERVICE_ROLE_KEY" --default-pin "1234" --admin-pin "admin123"
 ```
 
-Esto crea/actualiza estas pestañas:
+Esto carga estas tablas:
 
 ```text
-Users, Matches, Predictions, GroupPicks, FinalPicks, Results, AuditLog, Settings, Ranking, Detail
+users, matches, predictions, group_picks, final_picks, results, audit_log, settings, ranking, detail
 ```
 
 ### Ejecutar local
@@ -132,11 +134,9 @@ pip install -r requirements.txt
 Copia `.streamlit/secrets.toml.example` a `.streamlit/secrets.toml` y completa:
 
 ```toml
-[google_sheets]
-spreadsheet_id = "ID_DEL_GOOGLE_SHEET_BACKEND"
-
-[gcp_service_account]
-# contenido del JSON de la service account
+[supabase]
+url = "SUPABASE_URL"
+service_role_key = "SUPABASE_SERVICE_ROLE_KEY"
 ```
 
 Luego ejecuta:
@@ -150,7 +150,7 @@ streamlit run app.py
 1. Sube el repo a GitHub.
 2. Crea una app en Streamlit Cloud apuntando a `app.py`.
 3. En `Secrets`, pega el contenido equivalente a `.streamlit/secrets.toml`.
-4. Confirma que la Service Account tenga permiso de editor sobre el Google Sheet backend.
+4. Confirma que Supabase tenga las tablas creadas con `supabase/schema.sql`.
 
 ## Automatizacion con GitHub Actions
 
@@ -170,12 +170,12 @@ Hace:
 Configura estos secrets en GitHub:
 
 ```text
-APP_SPREADSHEET_ID
-GOOGLE_SERVICE_ACCOUNT_JSON
+SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY
 POLLA_SMTP_USER
 POLLA_SMTP_PASSWORD
 ```
 
-`GOOGLE_SERVICE_ACCOUNT_JSON` debe ser el JSON completo de la Service Account en una sola linea o como bloque JSON valido. La Service Account debe tener permiso de editor sobre el Google Sheet backend.
+`SUPABASE_SERVICE_ROLE_KEY` es sensible. Guardalo solo en GitHub Secrets y Streamlit Secrets; no lo subas al repo.
 
 Tambien puedes ejecutarlo manualmente desde GitHub en `Actions > Update Polla Backend > Run workflow`.

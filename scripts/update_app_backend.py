@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import sys
 from pathlib import Path
@@ -14,7 +13,7 @@ from polla.emailer import build_changes_email, send_messages
 from polla.models import MatchResult
 from polla.results import update_results_from_sources
 from polla.scoring import score_all
-from polla.store import GoogleSheetsStore
+from polla.supabase_store import SupabaseStore
 from polla.timeutils import now_bogota
 
 
@@ -77,14 +76,14 @@ def main() -> int:
     return 0
 
 
-def _store_from_env() -> GoogleSheetsStore:
-    spreadsheet_id = os.environ.get("APP_SPREADSHEET_ID")
-    raw_credentials = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
-    if not spreadsheet_id:
-        raise RuntimeError("Falta secret APP_SPREADSHEET_ID.")
-    if not raw_credentials:
-        raise RuntimeError("Falta secret GOOGLE_SERVICE_ACCOUNT_JSON.")
-    return GoogleSheetsStore(spreadsheet_id, json.loads(raw_credentials))
+def _store_from_env() -> SupabaseStore:
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    if not url:
+        raise RuntimeError("Falta secret SUPABASE_URL.")
+    if not key:
+        raise RuntimeError("Falta secret SUPABASE_SERVICE_ROLE_KEY.")
+    return SupabaseStore(url, key)
 
 
 def _dedupe_results(results: list[MatchResult]) -> list[MatchResult]:

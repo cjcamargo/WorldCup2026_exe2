@@ -10,7 +10,8 @@ import streamlit as st
 from polla.config import config_path, load_json
 from polla.models import FinalPicks, GroupPick, MatchResult
 from polla.scoring import score_all
-from polla.store import GoogleSheetsStore, verify_pin
+from polla.store import verify_pin
+from polla.supabase_store import SupabaseStore
 from polla.timeutils import BOGOTA, now_bogota
 
 
@@ -18,14 +19,14 @@ st.set_page_config(page_title="Polla Mundialista", page_icon="1:2", layout="wide
 
 
 @st.cache_resource(ttl=300)
-def get_store() -> GoogleSheetsStore:
-    sheets_cfg = st.secrets.get("google_sheets", {})
-    spreadsheet_id = sheets_cfg.get("spreadsheet_id")
-    credentials = st.secrets.get("gcp_service_account")
-    if not spreadsheet_id or not credentials:
-        st.error("Faltan secrets de Google Sheets. Configura google_sheets.spreadsheet_id y gcp_service_account.")
+def get_store() -> SupabaseStore:
+    supabase_cfg = st.secrets.get("supabase", {})
+    url = supabase_cfg.get("url")
+    key = supabase_cfg.get("service_role_key")
+    if not url or not key:
+        st.error("Faltan secrets de Supabase. Configura supabase.url y supabase.service_role_key.")
         st.stop()
-    store = GoogleSheetsStore(spreadsheet_id, dict(credentials))
+    store = SupabaseStore(url, key)
     store.ensure_schema()
     return store
 
@@ -231,7 +232,7 @@ def admin_view(state: dict[str, Any]) -> None:
         store.replace_rows("Ranking", ranking or [{"participant": "", "points": 0, "rank": ""}])
         store.replace_rows("Detail", _fit_detail_rows(detail))
         load_state.clear()
-        st.success("Ranking guardado en Google Sheets.")
+        st.success("Ranking guardado en Supabase.")
 
 
 def _score_state(state: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:

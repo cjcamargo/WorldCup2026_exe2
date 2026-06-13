@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import sys
 from pathlib import Path
@@ -10,17 +9,17 @@ from openpyxl import load_workbook
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from polla.config import ROOT, config_path, data_path, load_json, output_path
+from polla.config import config_path, data_path, load_json, output_path
 from polla.results import load_confirmed_results
 from polla.schedule import load_schedule
-from polla.store import GoogleSheetsStore, hash_pin
+from polla.store import hash_pin
+from polla.supabase_store import SupabaseStore
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Inicializa el Google Sheet backend de la app Streamlit.")
-    parser.add_argument("--spreadsheet-id", help="ID de un Google Sheet existente. Si se omite, se crea uno nuevo.")
-    parser.add_argument("--title", default="Polla Mundialista App DB", help="Titulo si se crea un Google Sheet nuevo.")
-    parser.add_argument("--service-account-json", help="Ruta al JSON de service account. Alternativa: GOOGLE_SERVICE_ACCOUNT_JSON.")
+    parser = argparse.ArgumentParser(description="Inicializa tablas Supabase de la app Streamlit.")
+    parser.add_argument("--url", default=os.environ.get("SUPABASE_URL"), help="Supabase project URL.")
+    parser.add_argument("--service-role-key", default=os.environ.get("SUPABASE_SERVICE_ROLE_KEY"), help="Supabase service role key.")
     parser.add_argument("--default-pin", default="1234", help="PIN inicial para participantes.")
     parser.add_argument("--admin-pin", default="admin123", help="PIN inicial para usuario admin.")
     return parser.parse_args()
@@ -28,10 +27,9 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    credentials = _load_credentials(args.service_account_json)
-    spreadsheet_id = args.spreadsheet_id or _create_spreadsheet(credentials, args.title)
-    store = GoogleSheetsStore(spreadsheet_id, credentials)
-    store.ensure_schema()
+    if not args.url or not args.service_role_key:
+        raise RuntimeError("Define --url/--service-role-key o SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY.")
+    store = SupabaseStore(args.url, args.service_role_key)
 
     participants = load_json(config_path("participantes.json"))["participants"]
     users = [
@@ -39,7 +37,7 @@ def main() -> int:
             "participant": item["name"],
             "pin_hash": hash_pin(item["name"], args.default_pin),
             "role": "player",
-            "active": str(bool(item.get("active", True))),
+            "active": bool(item.get("active", True)),
         }
         for item in participants
     ]
@@ -47,39 +45,20 @@ def main() -> int:
         "participant": "admin",
         "pin_hash": hash_pin("admin", args.admin_pin),
         "role": "admin",
-        "active": "True",
+        "active": True,
     })
-    store.replace_rows("Users", users)
-    store.replace_rows("Matches", [_match_row(match) for match in load_schedule(config_path("calendario_partidos.json"))])
-    store.replace_rows("Results", [_result_row(result) for result in _dedupe_results(load_confirmed_results(data_path("resultados", "resultados_confirmados.csv")))])
-    store.replace_rows("Settings", _initial_settings())
+    store.replace_rows("users", users)
+    store.replace_rows("matches", [_match_row(match) for match in load_schedule(config_path("calendario_partidos.json"))])
+    store.replace_rows("results", [_result_row(result) for result in _dedupe_results(load_confirmed_results(data_path("resultados", "resultados_confirmados.csv")))])
+    store.replace_rows("settings", _initial_settings())
     ranking_rows = _ranking_rows(output_path("ranking_polla.xlsx"))
     if ranking_rows:
-        store.replace_rows("Ranking", ranking_rows)
-    print("Google Sheet backend listo:")
-    print(f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit")
+        store.replace_rows("ranking", ranking_rows)
+
+    print("Supabase backend listo.")
     print(f"PIN inicial participantes: {args.default_pin}")
     print(f"PIN inicial admin: {args.admin_pin}")
     return 0
-
-
-def _load_credentials(path: str | None) -> dict:
-    if path:
-        return json.loads(Path(path).read_text(encoding="utf-8"))
-    raw = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
-    if raw:
-        return json.loads(raw)
-    raise RuntimeError("Define --service-account-json o GOOGLE_SERVICE_ACCOUNT_JSON.")
-
-
-def _create_spreadsheet(credentials: dict, title: str) -> str:
-    import gspread
-    from google.oauth2.service_account import Credentials
-
-    scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    client = gspread.authorize(Credentials.from_service_account_info(credentials, scopes=scopes))
-    spreadsheet = client.create(title)
-    return spreadsheet.id
 
 
 def _match_row(match) -> dict:
@@ -88,7 +67,7 @@ def _match_row(match) -> dict:
         "phase": match.phase,
         "team_a": match.team_a,
         "team_b": match.team_b,
-        "kickoff_at": match.kickoff_at.isoformat() if match.kickoff_at else "",
+        "kickoff_at": match.kickoff_at.isoformat() if match.kickoff_at else None,
         "status": match.status,
     }
 
@@ -102,10 +81,10 @@ def _result_row(result) -> dict:
         "goals_b_real": result.goals_b_real,
         "status": result.status,
         "phase": result.phase,
-        "kickoff_at": result.kickoff_at.isoformat() if result.kickoff_at else "",
+        "kickoff_at": result.kickoff_at.isoformat() if result.kickoff_at else None,
         "source": result.source,
         "source_url": result.source_url,
-        "confirmed": str(result.confirmed),
+        "confirmed": result.confirmed,
     }
 
 

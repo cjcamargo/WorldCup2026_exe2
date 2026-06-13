@@ -28,8 +28,8 @@ jobs:
 
       - name: Update results, ranking and alerts
         env:
-          APP_SPREADSHEET_ID: ${{ secrets.APP_SPREADSHEET_ID }}
-          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           POLLA_SMTP_USER: ${{ secrets.POLLA_SMTP_USER }}
           POLLA_SMTP_PASSWORD: ${{ secrets.POLLA_SMTP_PASSWORD }}
         run: python scripts/update_app_backend.py
