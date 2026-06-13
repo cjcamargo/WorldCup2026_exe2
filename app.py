@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -16,6 +17,9 @@ from polla.timeutils import BOGOTA, now_bogota
 
 
 st.set_page_config(page_title="Polla Mundialista", page_icon="1:2", layout="wide")
+
+
+LOGO_PATH = Path(__file__).parent / "assets" / "exe2_logo.svg"
 
 
 TEAM_FLAGS = {
@@ -100,7 +104,7 @@ def load_state() -> dict[str, Any]:
 
 def main() -> None:
     inject_styles()
-    st.title("Polla Mundialista")
+    render_header()
     if "participant" not in st.session_state:
         login()
         return
@@ -108,8 +112,9 @@ def main() -> None:
     state = load_state()
     participant = st.session_state["participant"]
     role = st.session_state["role"]
-    st.caption(f"Sesión: {participant}")
-    if st.button("Salir", type="secondary"):
+    session_col, exit_col = st.columns([1, 0.18], vertical_alignment="center")
+    session_col.caption(f"Sesión: {participant}")
+    if exit_col.button("Salir", type="secondary", use_container_width=True):
         st.session_state.clear()
         st.rerun()
 
@@ -130,6 +135,22 @@ def main() -> None:
     if role == "admin":
         with rendered_tabs[5]:
             admin_view(state)
+
+
+def render_header() -> None:
+    logo_svg = LOGO_PATH.read_text(encoding="utf-8")
+    st.markdown(
+        f"""
+        <section class="app-hero">
+          <div class="hero-logo">{logo_svg}</div>
+          <div class="hero-copy">
+            <h1>Polla Mundialista Exe2</h1>
+            <p>Pronósticos, ranking y resultados en una sola cancha.</p>
+          </div>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def login() -> None:
@@ -385,15 +406,99 @@ def inject_styles() -> None:
     st.markdown(
         """
         <style>
+        :root {
+            --exe-yellow: #fcd116;
+            --exe-blue: #003893;
+            --exe-red: #ce1126;
+            --exe-ink: #071b3a;
+            --exe-grass: #0f7a45;
+            --exe-surface: #ffffff;
+            --exe-border: #d7e0ea;
+        }
+        .stApp {
+            background:
+                linear-gradient(90deg, rgba(255,255,255,0.32) 1px, transparent 1px),
+                linear-gradient(180deg, rgba(255,255,255,0.24) 1px, transparent 1px),
+                linear-gradient(135deg, #f7faf8 0%, #edf7f0 44%, #f8fafc 100%);
+            background-size: 44px 44px, 44px 44px, auto;
+            color: var(--exe-ink);
+        }
         .block-container {
             max-width: 1280px;
             padding-top: 2rem;
+            padding-bottom: 3rem;
+        }
+        .app-hero {
+            display: grid;
+            grid-template-columns: minmax(220px, 360px) 1fr;
+            align-items: center;
+            gap: 1.6rem;
+            margin-bottom: 1rem;
+            padding: 1rem;
+            border-radius: 12px;
+            background:
+                linear-gradient(90deg, rgba(7,27,58,0.94), rgba(0,56,147,0.88)),
+                repeating-linear-gradient(90deg, transparent 0 42px, rgba(255,255,255,0.09) 42px 44px);
+            border: 1px solid rgba(255,255,255,0.36);
+            box-shadow: 0 18px 42px rgba(7, 27, 58, 0.18);
+        }
+        .hero-logo svg {
+            display: block;
+            width: min(100%, 360px);
+            height: auto;
+            border-radius: 18px;
+            box-shadow: 0 16px 34px rgba(0,0,0,0.22);
+        }
+        .hero-copy h1 {
+            margin: 0;
+            color: #ffffff;
+            font-size: clamp(2rem, 4vw, 4.6rem);
+            line-height: 0.98;
+            font-weight: 900;
+        }
+        .hero-copy p {
+            margin: 0.8rem 0 0;
+            color: #fff4b8;
+            font-size: 1.08rem;
+            font-weight: 650;
+        }
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 0.35rem;
+            border-bottom: 3px solid var(--exe-yellow);
+        }
+        .stTabs [data-baseweb="tab"] {
+            border-radius: 8px 8px 0 0;
+            color: var(--exe-ink);
+            font-weight: 750;
+        }
+        .stTabs [aria-selected="true"] {
+            background: var(--exe-blue);
+            color: #ffffff;
+        }
+        .stButton > button,
+        .stFormSubmitButton > button {
+            border-radius: 8px;
+            border: 1px solid #d3ab00;
+            background: var(--exe-yellow);
+            color: var(--exe-ink);
+            font-weight: 800;
+        }
+        .stButton > button:hover,
+        .stFormSubmitButton > button:hover {
+            border-color: var(--exe-blue);
+            color: var(--exe-blue);
         }
         div[data-testid="stMetric"] {
-            background: #f8fafc;
-            border: 1px solid #e5e7eb;
+            background: rgba(255,255,255,0.92);
+            border: 1px solid var(--exe-border);
             border-radius: 8px;
             padding: 0.7rem 0.85rem;
+            box-shadow: 0 8px 20px rgba(7,27,58,0.06);
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"] {
+            border-color: var(--exe-border);
+            box-shadow: 0 10px 22px rgba(7,27,58,0.07);
+            background: rgba(255,255,255,0.96);
         }
         .match-head {
             display: flex;
@@ -403,7 +508,7 @@ def inject_styles() -> None:
             margin-bottom: 0.4rem;
         }
         .match-id {
-            color: #64748b;
+            color: var(--exe-blue);
             font-size: 0.78rem;
             font-weight: 700;
         }
@@ -419,7 +524,7 @@ def inject_styles() -> None:
         }
         .match-status.locked {
             background: #fee2e2;
-            color: #991b1b;
+            color: var(--exe-red);
         }
         .match-title {
             display: grid;
@@ -438,9 +543,10 @@ def inject_styles() -> None:
             text-align: right;
         }
         .versus {
-            color: #94a3b8;
+            color: var(--exe-red);
             font-size: 0.75rem;
             text-transform: uppercase;
+            font-weight: 900;
         }
         .match-time {
             color: #64748b;
@@ -448,6 +554,13 @@ def inject_styles() -> None:
             margin: 0.35rem 0 0.55rem;
         }
         @media (max-width: 760px) {
+            .app-hero {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+            .hero-copy h1 {
+                font-size: 2.2rem;
+            }
             .match-title {
                 grid-template-columns: 1fr;
             }
