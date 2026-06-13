@@ -57,7 +57,7 @@ def main() -> int:
 
     if not args.dry_run:
         store.replace_rows("Results", [_result_row(result) for result in updated_results])
-        store.replace_rows("Ranking", ranking or [{"participant": "", "points": 0, "rank": ""}])
+        store.replace_rows("Ranking", ranking)
         store.replace_rows("Detail", _fit_detail_rows(detail))
         if audit_changes:
             store.save_setting("last_audit_email_at", max(change.detected_at for change in audit_changes))

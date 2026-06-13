@@ -229,7 +229,7 @@ def admin_view(state: dict[str, Any]) -> None:
     st.subheader("Publicar ranking")
     if st.button("Recalcular y guardar ranking"):
         ranking, detail = _score_state(state)
-        store.replace_rows("Ranking", ranking or [{"participant": "", "points": 0, "rank": ""}])
+        store.replace_rows("Ranking", ranking)
         store.replace_rows("Detail", _fit_detail_rows(detail))
         load_state.clear()
         st.success("Ranking guardado en Supabase.")
