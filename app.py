@@ -408,18 +408,20 @@ def inject_styles() -> None:
         <style>
         :root {
             --exe-yellow: #fcd116;
-            --exe-blue: #003893;
+            --exe-blue: #174ea6;
             --exe-red: #ce1126;
-            --exe-ink: #071b3a;
+            --exe-ink: #10251a;
             --exe-grass: #0f7a45;
+            --exe-grass-bright: #18a35c;
             --exe-surface: #ffffff;
             --exe-border: #d7e0ea;
         }
         .stApp {
             background:
-                linear-gradient(90deg, rgba(255,255,255,0.32) 1px, transparent 1px),
-                linear-gradient(180deg, rgba(255,255,255,0.24) 1px, transparent 1px),
-                linear-gradient(135deg, #f7faf8 0%, #edf7f0 44%, #f8fafc 100%);
+                radial-gradient(circle at 10% 0%, rgba(252,209,22,0.28), transparent 32%),
+                linear-gradient(90deg, rgba(15,122,69,0.12) 1px, transparent 1px),
+                linear-gradient(180deg, rgba(15,122,69,0.10) 1px, transparent 1px),
+                linear-gradient(135deg, #fbfff9 0%, #edf8ef 46%, #fff9df 100%);
             background-size: 44px 44px, 44px 44px, auto;
             color: var(--exe-ink);
         }
@@ -430,24 +432,25 @@ def inject_styles() -> None:
         }
         .app-hero {
             display: grid;
-            grid-template-columns: minmax(220px, 360px) 1fr;
+            grid-template-columns: minmax(260px, 420px) 1fr;
             align-items: center;
             gap: 1.6rem;
             margin-bottom: 1rem;
             padding: 1rem;
             border-radius: 12px;
             background:
-                linear-gradient(90deg, rgba(7,27,58,0.94), rgba(0,56,147,0.88)),
+                radial-gradient(circle at 80% 10%, rgba(252,209,22,0.42), transparent 28%),
+                linear-gradient(135deg, rgba(15,122,69,0.96), rgba(24,163,92,0.9)),
                 repeating-linear-gradient(90deg, transparent 0 42px, rgba(255,255,255,0.09) 42px 44px);
-            border: 1px solid rgba(255,255,255,0.36);
-            box-shadow: 0 18px 42px rgba(7, 27, 58, 0.18);
+            border: 1px solid rgba(255,255,255,0.58);
+            box-shadow: 0 18px 42px rgba(15, 122, 69, 0.22);
         }
         .hero-logo svg {
             display: block;
-            width: min(100%, 360px);
+            width: min(100%, 420px);
             height: auto;
             border-radius: 18px;
-            box-shadow: 0 16px 34px rgba(0,0,0,0.22);
+            box-shadow: 0 16px 34px rgba(16,37,26,0.22);
         }
         .hero-copy h1 {
             margin: 0;
