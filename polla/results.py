@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import html as html_lib
 import re
 import urllib.request
 from dataclasses import asdict
@@ -11,7 +12,7 @@ from typing import Any
 import pandas as pd
 
 from .models import MatchResult
-from .schedule import norm_text
+from .schedule import canonical_team_name, norm_text
 from .timeutils import as_bogota, now_bogota, parse_datetime
 
 
@@ -97,15 +98,39 @@ def fetch_wikipedia_results(source_cfg: dict) -> list[MatchResult]:
     return found
 
 
+def fetch_sbnation_schedule_results(source_cfg: dict) -> list[MatchResult]:
+    url = source_cfg["url"]
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=45) as response:
+        raw_html = response.read().decode("utf-8", errors="ignore")
+    text = html_lib.unescape(re.sub(r"<[^>]+>", "\n", raw_html))
+    found: list[MatchResult] = []
+    pattern = re.compile(
+        r"Group\s+[A-L]:\s+([A-Za-z .'\-çéôüıİ]+?)\s+(\d{1,2}),\s+([A-Za-z .'\-çéôüıİ]+?)\s+(\d{1,2})(?=\s|$)",
+        re.I,
+    )
+    for match in pattern.finditer(text):
+        team_a = canonical_team_name(match.group(1).strip())
+        team_b = canonical_team_name(match.group(3).strip())
+        found.append(MatchResult(
+            match_id=f"{_slug(team_a)}_vs_{_slug(team_b)}",
+            team_a=team_a,
+            team_b=team_b,
+            goals_a_real=int(match.group(2)),
+            goals_b_real=int(match.group(4)),
+            status="final",
+            source=source_cfg["name"],
+            source_url=url,
+            confirmed=True,
+        ))
+    return found
+
+
 def update_results_from_sources(schedule: list[MatchResult], existing: list[MatchResult], cfg: dict) -> tuple[list[MatchResult], list[str]]:
     existing_by_id = {r.match_id: r for r in existing}
     warnings: list[str] = []
-    candidates: list[MatchResult] = _manual_result_candidates(cfg)
-    manual_ids = {candidate.match_id for candidate in candidates if candidate.match_id}
-    due = [
-        match for match in schedule
-        if should_check_result(match, cfg) or _manual_result_is_pending(match, manual_ids, existing_by_id)
-    ]
+    candidates: list[MatchResult] = []
+    due = [m for m in schedule if should_check_result(m, cfg)]
     if not due:
         return existing, warnings
     for source in cfg.get("sources", []):
@@ -114,6 +139,8 @@ def update_results_from_sources(schedule: list[MatchResult], existing: list[Matc
         try:
             if source["type"] == "wikipedia_tables":
                 candidates.extend(fetch_wikipedia_results(source))
+            elif source["type"] == "sbnation_schedule":
+                candidates.extend(fetch_sbnation_schedule_results(source))
         except Exception as exc:  # noqa: BLE001
             warnings.append(f"No se pudo consultar {source.get('name')}: {exc}")
     for match in due:
@@ -155,30 +182,6 @@ def _parse_score_lines(text: str, source: str, url: str) -> list[MatchResult]:
             confirmed=True,
         ))
     return results
-
-
-def _manual_result_candidates(cfg: dict) -> list[MatchResult]:
-    candidates: list[MatchResult] = []
-    for item in cfg.get("manual_results", []):
-        if not item.get("confirmed", True):
-            continue
-        candidates.append(MatchResult(
-            match_id=item.get("match_id", ""),
-            team_a=item["team_a"],
-            team_b=item["team_b"],
-            goals_a_real=_to_int(item.get("goals_a_real")),
-            goals_b_real=_to_int(item.get("goals_b_real")),
-            status=item.get("status", "final"),
-            source=item.get("source"),
-            source_url=item.get("source_url"),
-            confirmed=True,
-        ))
-    return candidates
-
-
-def _manual_result_is_pending(match: MatchResult, manual_ids: set[str], existing_by_id: dict[str, MatchResult]) -> bool:
-    existing = existing_by_id.get(match.match_id)
-    return match.match_id in manual_ids and not (existing and existing.confirmed)
 
 
 def _find_candidate(match: MatchResult, candidates: list[MatchResult]) -> MatchResult | None:

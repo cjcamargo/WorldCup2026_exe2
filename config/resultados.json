@@ -14,6 +14,12 @@
       "enabled": true
     },
     {
+      "name": "sbnation_world_cup_schedule",
+      "type": "sbnation_schedule",
+      "url": "https://www.sbnation.com/soccer/1117513/world-cup-schedule-2026-how-to-watch-every-match-scores-and-more",
+      "enabled": true
+    },
+    {
       "name": "wikipedia_group_a",
       "type": "wikipedia_tables",
       "url": "https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_Group_A",
@@ -84,19 +90,6 @@
       "type": "wikipedia_tables",
       "url": "https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_Group_L",
       "enabled": true
-    }
-  ],
-  "manual_results": [
-    {
-      "match_id": "M005",
-      "team_a": "Qatar",
-      "team_b": "Switzerland",
-      "goals_a_real": 1,
-      "goals_b_real": 1,
-      "status": "final",
-      "source": "The Guardian",
-      "source_url": "https://www.theguardian.com/football/live/2026/jun/13/qatar-v-switzerland-world-cup-2026-live",
-      "confirmed": true
     }
   ]
 }
