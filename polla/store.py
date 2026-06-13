@@ -175,6 +175,26 @@ class GoogleSheetsStore:
                 values[row["key"]] = _decode(row.get("value"))
         return values
 
+    def audit_changes_after(self, detected_after: str | None) -> list[AuditChange]:
+        changes: list[AuditChange] = []
+        for row in self._rows("AuditLog"):
+            detected_at = str(row.get("detected_at") or "")
+            if not detected_at:
+                continue
+            if detected_after and detected_at <= detected_after:
+                continue
+            changes.append(AuditChange(
+                detected_at=detected_at,
+                participant=str(row.get("participant") or ""),
+                match_id=str(row.get("match_id") or ""),
+                field=str(row.get("field") or ""),
+                old_value=row.get("old_value"),
+                new_value=row.get("new_value"),
+                status=str(row.get("status") or ""),
+                reason=str(row.get("reason") or "") or None,
+            ))
+        return changes
+
     def save_prediction(self, participant: str, match: MatchResult, goals_a: int | None, goals_b: int | None, at: datetime) -> None:
         if match.kickoff_at and at >= match.kickoff_at:
             raise ValueError("Este partido ya inicio y no puede editarse.")

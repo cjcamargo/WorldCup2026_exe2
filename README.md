@@ -151,3 +151,31 @@ streamlit run app.py
 2. Crea una app en Streamlit Cloud apuntando a `app.py`.
 3. En `Secrets`, pega el contenido equivalente a `.streamlit/secrets.toml`.
 4. Confirma que la Service Account tenga permiso de editor sobre el Google Sheet backend.
+
+## Automatizacion con GitHub Actions
+
+El workflow `.github/workflows/update-polla.yml` ejecuta cada hora:
+
+```text
+python scripts/update_app_backend.py
+```
+
+Hace:
+
+- consulta resultados pendientes,
+- actualiza `Results`,
+- recalcula `Ranking` y `Detail`,
+- envia un solo correo agrupado con cambios nuevos de `AuditLog`.
+
+Configura estos secrets en GitHub:
+
+```text
+APP_SPREADSHEET_ID
+GOOGLE_SERVICE_ACCOUNT_JSON
+POLLA_SMTP_USER
+POLLA_SMTP_PASSWORD
+```
+
+`GOOGLE_SERVICE_ACCOUNT_JSON` debe ser el JSON completo de la Service Account en una sola linea o como bloque JSON valido. La Service Account debe tener permiso de editor sobre el Google Sheet backend.
+
+Tambien puedes ejecutarlo manualmente desde GitHub en `Actions > Update Polla Backend > Run workflow`.
