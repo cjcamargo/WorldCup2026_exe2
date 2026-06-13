@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -19,7 +20,7 @@ from polla.timeutils import BOGOTA, now_bogota
 st.set_page_config(page_title="Polla Mundialista", page_icon="1:2", layout="wide")
 
 
-LOGO_PATH = Path(__file__).parent / "assets" / "exe2_logo.svg"
+LOGO_PATH = Path(__file__).parent / "assets" / "exe2_logo.png"
 
 
 TEAM_FLAGS = {
@@ -138,11 +139,11 @@ def main() -> None:
 
 
 def render_header() -> None:
-    logo_svg = LOGO_PATH.read_text(encoding="utf-8")
+    logo_data = base64.b64encode(LOGO_PATH.read_bytes()).decode("ascii")
     st.markdown(
         f"""
         <section class="app-hero">
-          <div class="hero-logo">{logo_svg}</div>
+          <div class="hero-logo"><img src="data:image/png;base64,{logo_data}" alt="Exe2 logo" /></div>
           <div class="hero-copy">
             <h1>Polla Mundialista Exe2</h1>
             <p>Pronósticos, ranking y resultados en una sola cancha.</p>
@@ -418,10 +419,11 @@ def inject_styles() -> None:
         }
         .stApp {
             background:
-                radial-gradient(circle at 10% 0%, rgba(252,209,22,0.28), transparent 32%),
-                linear-gradient(90deg, rgba(15,122,69,0.12) 1px, transparent 1px),
-                linear-gradient(180deg, rgba(15,122,69,0.10) 1px, transparent 1px),
-                linear-gradient(135deg, #fbfff9 0%, #edf8ef 46%, #fff9df 100%);
+                radial-gradient(circle at 12% 0%, rgba(24,163,92,0.18), transparent 30%),
+                radial-gradient(circle at 88% 8%, rgba(23,78,166,0.10), transparent 28%),
+                linear-gradient(90deg, rgba(15,122,69,0.08) 1px, transparent 1px),
+                linear-gradient(180deg, rgba(15,122,69,0.07) 1px, transparent 1px),
+                linear-gradient(135deg, #fbfffd 0%, #eef8f1 52%, #f8fbff 100%);
             background-size: 44px 44px, 44px 44px, auto;
             color: var(--exe-ink);
         }
@@ -439,18 +441,23 @@ def inject_styles() -> None:
             padding: 1rem;
             border-radius: 12px;
             background:
-                radial-gradient(circle at 80% 10%, rgba(252,209,22,0.42), transparent 28%),
-                linear-gradient(135deg, rgba(15,122,69,0.96), rgba(24,163,92,0.9)),
+                radial-gradient(circle at 82% 12%, rgba(255,255,255,0.26), transparent 30%),
+                linear-gradient(135deg, rgba(15,122,69,0.96), rgba(28,147,82,0.92)),
                 repeating-linear-gradient(90deg, transparent 0 42px, rgba(255,255,255,0.09) 42px 44px);
             border: 1px solid rgba(255,255,255,0.58);
             box-shadow: 0 18px 42px rgba(15, 122, 69, 0.22);
         }
-        .hero-logo svg {
+        .hero-logo {
+            border-radius: 18px;
+            background: rgba(255,255,255,0.96);
+            padding: 0.65rem;
+            box-shadow: 0 16px 34px rgba(16,37,26,0.22);
+        }
+        .hero-logo img {
             display: block;
             width: min(100%, 420px);
             height: auto;
-            border-radius: 18px;
-            box-shadow: 0 16px 34px rgba(16,37,26,0.22);
+            border-radius: 14px;
         }
         .hero-copy h1 {
             margin: 0;
