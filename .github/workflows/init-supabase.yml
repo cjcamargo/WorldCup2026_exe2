@@ -1,0 +1,39 @@
+name: Init Supabase Backend
+
+on:
+  workflow_dispatch:
+    inputs:
+      default_pin:
+        description: "PIN inicial para participantes"
+        required: true
+        default: "1234"
+      admin_pin:
+        description: "PIN inicial para admin"
+        required: true
+        default: "admin123"
+
+jobs:
+  init:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Initialize Supabase tables
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: >
+          python scripts/init_supabase.py
+          --default-pin "${{ github.event.inputs.default_pin }}"
+          --admin-pin "${{ github.event.inputs.admin_pin }}"

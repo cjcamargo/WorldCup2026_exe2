@@ -117,6 +117,12 @@ app.py
 python scripts\init_supabase.py --url "SUPABASE_URL" --service-role-key "SUPABASE_SERVICE_ROLE_KEY" --default-pin "1234" --admin-pin "admin123"
 ```
 
+Tambien puedes inicializar sin exponer la key localmente desde GitHub:
+
+```text
+Actions > Init Supabase Backend > Run workflow
+```
+
 Esto carga estas tablas:
 
 ```text
