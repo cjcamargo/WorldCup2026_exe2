@@ -166,7 +166,7 @@ class SupabaseStore:
 
     def replace_rows(self, table_name: str, rows: list[dict[str, Any]]) -> None:
         table = _table_name(table_name)
-        self.client.table(table).delete().neq(_delete_filter_column(table), "__never__").execute()
+        _delete_all_rows(self.client, table)
         if rows:
             self.client.table(table).insert([_clean_row(row) for row in rows]).execute()
 
@@ -251,6 +251,15 @@ def _delete_filter_column(table: str) -> str:
         "settings": "key",
         "ranking": "participant",
     }.get(table, "id")
+
+
+def _delete_all_rows(client: Any, table: str) -> None:
+    filter_column = _delete_filter_column(table)
+    delete_query = client.table(table).delete()
+    if filter_column == "id":
+        delete_query.gte("id", 0).execute()
+        return
+    delete_query.neq(filter_column, "__never__").execute()
 
 
 def _clean_row(row: dict[str, Any]) -> dict[str, Any]:
