@@ -1,0 +1,1 @@
+"""Polla Mundialista automation package."""

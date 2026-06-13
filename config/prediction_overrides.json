@@ -1,0 +1,25 @@
+{
+  "overrides": [
+    {
+      "participant": "Oscar",
+      "match_id": "M001",
+      "goals_a_pred": 2,
+      "goals_b_pred": 1,
+      "note": "Ajuste manual segun captura del usuario"
+    },
+    {
+      "participant": "Eduard",
+      "match_id": "M001",
+      "goals_a_pred": 1,
+      "goals_b_pred": 1,
+      "note": "Ajuste manual segun captura del usuario"
+    },
+    {
+      "participant": "Eduard",
+      "match_id": "M002",
+      "goals_a_pred": 1,
+      "goals_b_pred": 2,
+      "note": "Ajuste manual segun captura del usuario"
+    }
+  ]
+}

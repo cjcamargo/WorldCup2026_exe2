@@ -1,0 +1,580 @@
+{
+  "matches": [
+    {
+      "match_id": "M001",
+      "phase": "Group A",
+      "team_a": "Mexico",
+      "team_b": "South Africa",
+      "kickoff_at": "2026-06-11T14:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M002",
+      "phase": "Group A",
+      "team_a": "South Korea",
+      "team_b": "Czech Republic",
+      "kickoff_at": "2026-06-11T21:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M003",
+      "phase": "Group B",
+      "team_a": "Canada",
+      "team_b": "Bosnia and Herzegovina",
+      "kickoff_at": "2026-06-12T14:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M004",
+      "phase": "Group D",
+      "team_a": "United States",
+      "team_b": "Paraguay",
+      "kickoff_at": "2026-06-12T20:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M005",
+      "phase": "Group B",
+      "team_a": "Qatar",
+      "team_b": "Switzerland",
+      "kickoff_at": "2026-06-13T14:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M006",
+      "phase": "Group C",
+      "team_a": "Brazil",
+      "team_b": "Morocco",
+      "kickoff_at": "2026-06-13T17:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M007",
+      "phase": "Group C",
+      "team_a": "Haiti",
+      "team_b": "Scotland",
+      "kickoff_at": "2026-06-13T20:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M008",
+      "phase": "Group D",
+      "team_a": "Australia",
+      "team_b": "Türkiye",
+      "kickoff_at": "2026-06-13T23:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M009",
+      "phase": "Group E",
+      "team_a": "Germany",
+      "team_b": "Curaçao",
+      "kickoff_at": "2026-06-14T12:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M010",
+      "phase": "Group F",
+      "team_a": "Netherlands",
+      "team_b": "Japan",
+      "kickoff_at": "2026-06-14T15:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M011",
+      "phase": "Group E",
+      "team_a": "Côte d'Ivoire",
+      "team_b": "Ecuador",
+      "kickoff_at": "2026-06-14T18:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M012",
+      "phase": "Group F",
+      "team_a": "Sweden",
+      "team_b": "Tunisia",
+      "kickoff_at": "2026-06-14T21:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M013",
+      "phase": "Group H",
+      "team_a": "Spain",
+      "team_b": "Cabo Verde",
+      "kickoff_at": "2026-06-15T11:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M014",
+      "phase": "Group G",
+      "team_a": "Belgium",
+      "team_b": "Egypt",
+      "kickoff_at": "2026-06-15T14:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M015",
+      "phase": "Group H",
+      "team_a": "Saudi Arabia",
+      "team_b": "Uruguay",
+      "kickoff_at": "2026-06-15T17:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M016",
+      "phase": "Group G",
+      "team_a": "IR Iran",
+      "team_b": "New Zealand",
+      "kickoff_at": "2026-06-15T20:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M017",
+      "phase": "Group I",
+      "team_a": "France",
+      "team_b": "Senegal",
+      "kickoff_at": "2026-06-16T14:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M018",
+      "phase": "Group I",
+      "team_a": "Iraq",
+      "team_b": "Norway",
+      "kickoff_at": "2026-06-16T17:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M019",
+      "phase": "Group J",
+      "team_a": "Argentina",
+      "team_b": "Algeria",
+      "kickoff_at": "2026-06-16T20:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M020",
+      "phase": "Group J",
+      "team_a": "Austria",
+      "team_b": "Jordan",
+      "kickoff_at": "2026-06-16T23:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M021",
+      "phase": "Group K",
+      "team_a": "Portugal",
+      "team_b": "DR Congo",
+      "kickoff_at": "2026-06-17T12:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M022",
+      "phase": "Group L",
+      "team_a": "England",
+      "team_b": "Croatia",
+      "kickoff_at": "2026-06-17T15:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M023",
+      "phase": "Group L",
+      "team_a": "Ghana",
+      "team_b": "Panama",
+      "kickoff_at": "2026-06-17T18:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M024",
+      "phase": "Group K",
+      "team_a": "Uzbekistan",
+      "team_b": "Colombia",
+      "kickoff_at": "2026-06-17T21:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M025",
+      "phase": "Group A",
+      "team_a": "Czech Republic",
+      "team_b": "South Africa",
+      "kickoff_at": "2026-06-18T11:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M026",
+      "phase": "Group B",
+      "team_a": "Switzerland",
+      "team_b": "Bosnia and Herzegovina",
+      "kickoff_at": "2026-06-18T14:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M027",
+      "phase": "Group B",
+      "team_a": "Canada",
+      "team_b": "Qatar",
+      "kickoff_at": "2026-06-18T17:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M028",
+      "phase": "Group A",
+      "team_a": "Mexico",
+      "team_b": "South Korea",
+      "kickoff_at": "2026-06-18T20:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M029",
+      "phase": "Group D",
+      "team_a": "United States",
+      "team_b": "Australia",
+      "kickoff_at": "2026-06-19T14:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M030",
+      "phase": "Group C",
+      "team_a": "Scotland",
+      "team_b": "Morocco",
+      "kickoff_at": "2026-06-19T17:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M031",
+      "phase": "Group C",
+      "team_a": "Brazil",
+      "team_b": "Haiti",
+      "kickoff_at": "2026-06-19T19:30:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M032",
+      "phase": "Group D",
+      "team_a": "Türkiye",
+      "team_b": "Paraguay",
+      "kickoff_at": "2026-06-19T22:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M033",
+      "phase": "Group F",
+      "team_a": "Netherlands",
+      "team_b": "Sweden",
+      "kickoff_at": "2026-06-20T12:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M034",
+      "phase": "Group E",
+      "team_a": "Germany",
+      "team_b": "Côte d'Ivoire",
+      "kickoff_at": "2026-06-20T15:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M035",
+      "phase": "Group E",
+      "team_a": "Ecuador",
+      "team_b": "Curaçao",
+      "kickoff_at": "2026-06-20T19:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M036",
+      "phase": "Group F",
+      "team_a": "Tunisia",
+      "team_b": "Japan",
+      "kickoff_at": "2026-06-20T23:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M037",
+      "phase": "Group H",
+      "team_a": "Spain",
+      "team_b": "Saudi Arabia",
+      "kickoff_at": "2026-06-21T11:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M038",
+      "phase": "Group G",
+      "team_a": "Belgium",
+      "team_b": "IR Iran",
+      "kickoff_at": "2026-06-21T14:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M039",
+      "phase": "Group H",
+      "team_a": "Uruguay",
+      "team_b": "Cabo Verde",
+      "kickoff_at": "2026-06-21T17:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M040",
+      "phase": "Group G",
+      "team_a": "New Zealand",
+      "team_b": "Egypt",
+      "kickoff_at": "2026-06-21T20:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M041",
+      "phase": "Group J",
+      "team_a": "Argentina",
+      "team_b": "Austria",
+      "kickoff_at": "2026-06-22T12:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M042",
+      "phase": "Group I",
+      "team_a": "France",
+      "team_b": "Iraq",
+      "kickoff_at": "2026-06-22T16:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M043",
+      "phase": "Group I",
+      "team_a": "Norway",
+      "team_b": "Senegal",
+      "kickoff_at": "2026-06-22T19:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M044",
+      "phase": "Group J",
+      "team_a": "Jordan",
+      "team_b": "Algeria",
+      "kickoff_at": "2026-06-22T22:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M045",
+      "phase": "Group K",
+      "team_a": "Portugal",
+      "team_b": "Uzbekistan",
+      "kickoff_at": "2026-06-23T12:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M046",
+      "phase": "Group L",
+      "team_a": "England",
+      "team_b": "Ghana",
+      "kickoff_at": "2026-06-23T15:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M047",
+      "phase": "Group L",
+      "team_a": "Panama",
+      "team_b": "Croatia",
+      "kickoff_at": "2026-06-23T18:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M048",
+      "phase": "Group K",
+      "team_a": "Colombia",
+      "team_b": "DR Congo",
+      "kickoff_at": "2026-06-23T21:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M049",
+      "phase": "Group B",
+      "team_a": "Switzerland",
+      "team_b": "Canada",
+      "kickoff_at": "2026-06-24T14:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M050",
+      "phase": "Group B",
+      "team_a": "Bosnia and Herzegovina",
+      "team_b": "Qatar",
+      "kickoff_at": "2026-06-24T14:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M051",
+      "phase": "Group C",
+      "team_a": "Scotland",
+      "team_b": "Brazil",
+      "kickoff_at": "2026-06-24T17:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M052",
+      "phase": "Group C",
+      "team_a": "Morocco",
+      "team_b": "Haiti",
+      "kickoff_at": "2026-06-24T17:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M053",
+      "phase": "Group A",
+      "team_a": "Czech Republic",
+      "team_b": "Mexico",
+      "kickoff_at": "2026-06-24T20:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M054",
+      "phase": "Group A",
+      "team_a": "South Africa",
+      "team_b": "South Korea",
+      "kickoff_at": "2026-06-24T20:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M055",
+      "phase": "Group E",
+      "team_a": "Curaçao",
+      "team_b": "Côte d'Ivoire",
+      "kickoff_at": "2026-06-25T15:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M056",
+      "phase": "Group E",
+      "team_a": "Ecuador",
+      "team_b": "Germany",
+      "kickoff_at": "2026-06-25T15:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M057",
+      "phase": "Group F",
+      "team_a": "Japan",
+      "team_b": "Sweden",
+      "kickoff_at": "2026-06-25T18:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M058",
+      "phase": "Group F",
+      "team_a": "Tunisia",
+      "team_b": "Netherlands",
+      "kickoff_at": "2026-06-25T18:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M059",
+      "phase": "Group D",
+      "team_a": "Türkiye",
+      "team_b": "United States",
+      "kickoff_at": "2026-06-25T21:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M060",
+      "phase": "Group D",
+      "team_a": "Paraguay",
+      "team_b": "Australia",
+      "kickoff_at": "2026-06-25T21:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M061",
+      "phase": "Group I",
+      "team_a": "Norway",
+      "team_b": "France",
+      "kickoff_at": "2026-06-26T14:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M062",
+      "phase": "Group I",
+      "team_a": "Senegal",
+      "team_b": "Iraq",
+      "kickoff_at": "2026-06-26T14:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M063",
+      "phase": "Group H",
+      "team_a": "Cabo Verde",
+      "team_b": "Saudi Arabia",
+      "kickoff_at": "2026-06-26T19:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M064",
+      "phase": "Group H",
+      "team_a": "Uruguay",
+      "team_b": "Spain",
+      "kickoff_at": "2026-06-26T19:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M065",
+      "phase": "Group G",
+      "team_a": "Egypt",
+      "team_b": "IR Iran",
+      "kickoff_at": "2026-06-26T22:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M066",
+      "phase": "Group G",
+      "team_a": "New Zealand",
+      "team_b": "Belgium",
+      "kickoff_at": "2026-06-26T22:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M067",
+      "phase": "Group L",
+      "team_a": "Panama",
+      "team_b": "England",
+      "kickoff_at": "2026-06-27T16:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M068",
+      "phase": "Group L",
+      "team_a": "Croatia",
+      "team_b": "Ghana",
+      "kickoff_at": "2026-06-27T16:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M069",
+      "phase": "Group K",
+      "team_a": "Colombia",
+      "team_b": "Portugal",
+      "kickoff_at": "2026-06-27T18:30:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M070",
+      "phase": "Group K",
+      "team_a": "DR Congo",
+      "team_b": "Uzbekistan",
+      "kickoff_at": "2026-06-27T18:30:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M071",
+      "phase": "Group J",
+      "team_a": "Algeria",
+      "team_b": "Austria",
+      "kickoff_at": "2026-06-27T21:00:00-05:00",
+      "status": "scheduled"
+    },
+    {
+      "match_id": "M072",
+      "phase": "Group J",
+      "team_a": "Jordan",
+      "team_b": "Argentina",
+      "kickoff_at": "2026-06-27T21:00:00-05:00",
+      "status": "scheduled"
+    }
+  ]
+}

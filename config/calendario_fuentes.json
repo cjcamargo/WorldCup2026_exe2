@@ -1,0 +1,12 @@
+{
+  "expected_group_stage_matches": 72,
+  "sources": [
+    {
+      "name": "wikipedia_group_pages_raw",
+      "type": "wikipedia_group_pages_raw",
+      "enabled": true,
+      "groups": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"],
+      "url_template": "https://en.wikipedia.org/w/index.php?title=2026_FIFA_World_Cup_Group_{group}&action=raw"
+    }
+  ]
+}

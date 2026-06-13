@@ -1,0 +1,35 @@
+{
+  "drive_folder_url": "https://drive.google.com/drive/folders/1ov7qQXcX3IwFsES87ix46exmG_Wua5AF?usp=drive_link",
+  "participants": [
+    {
+      "name": "CarlosF",
+      "drive_file_id": "1JYqqJkWZNem4A6--3EGvcuv57yK9uP-4",
+      "file_name": "CarlosF.xlsx",
+      "active": true
+    },
+    {
+      "name": "Alex",
+      "drive_file_id": "1GBB0DZ8Yfejz9tJQFEifnK5GUjAfIhVS",
+      "file_name": "Alex.xlsx",
+      "active": true
+    },
+    {
+      "name": "Oscar",
+      "drive_file_id": "1pSBgR3lHfilb65klQ24-yczztnkz6s6J",
+      "file_name": "Oscar.xlsx",
+      "active": true
+    },
+    {
+      "name": "Eduard",
+      "drive_file_id": "1jM6B0nCfmg3IlfvhH4gRG7awKsgoHRli",
+      "file_name": "Eduard.xlsx",
+      "active": true
+    },
+    {
+      "name": "Charlie",
+      "drive_file_id": "1kyTuDIdsCGh6K5oMlzVipGqvxPc_v1p4",
+      "file_name": "Charlie.xlsx",
+      "active": true
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "enabled": true,
+  "dry_run": false,
+  "to": [
+    "carlosjeyson10@gmail.com"
+  ],
+  "from": "cjcamargo12@gmail.com",
+  "smtp_host": "smtp.gmail.com",
+  "smtp_port": 587,
+  "smtp_user_env": "POLLA_SMTP_USER",
+  "smtp_password_env": "POLLA_SMTP_PASSWORD"
+}

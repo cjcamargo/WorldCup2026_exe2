@@ -1,0 +1,8 @@
+{
+  "enabled": true,
+  "credentials_path": "data/secrets/google_oauth_client.json",
+  "token_path": "data/secrets/google_drive_token.json",
+  "scopes": [
+    "https://www.googleapis.com/auth/drive.readonly"
+  ]
+}

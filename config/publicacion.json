@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "google_sheet": {
+    "title": "Ranking Polla Mundialista",
+    "spreadsheet_id": "1HzimDaKvvga0Wc3gxoC-HIDRhYwsSuN4hORDumc8SQc",
+    "url": "https://docs.google.com/spreadsheets/d/1HzimDaKvvga0Wc3gxoC-HIDRhYwsSuN4hORDumc8SQc/edit",
+    "tabs": [
+      "Ranking",
+      "Detalle",
+      "Alertas"
+    ]
+  },
+  "sharing_note": "Configurar una sola vez en Google Drive: Compartir > Acceso general > Cualquier persona con el enlace > Lector."
+}

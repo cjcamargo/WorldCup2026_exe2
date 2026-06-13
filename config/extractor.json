@@ -1,0 +1,31 @@
+{
+  "mode": "ingreso",
+  "ingreso": {
+    "sheet": "Ingreso",
+    "phase": "Group stage",
+    "first_header_row": 8,
+    "last_header_row": 434,
+    "row_step": 6,
+    "match_id_col": "B",
+    "team_a_col": "F",
+    "goals_a_col": "G",
+    "goals_b_col": "J",
+    "team_b_col": "L"
+  },
+  "sheets": {
+    "include": [],
+    "exclude": []
+  },
+  "manual_match_ranges": [],
+  "final_picks": {
+    "champion_cell": null,
+    "runner_up_cell": null,
+    "third_place_cell": null,
+    "sheet": null
+  },
+  "notes": [
+    "mode=ingreso lee la hoja de captura real: partido en columna B, equipos en F/L y marcadores en G/J.",
+    "mode=heuristic intenta detectar filas con dos equipos y dos marcadores numericos.",
+    "Para produccion conviene reemplazar manual_match_ranges con celdas exactas de la plantilla."
+  ]
+}
