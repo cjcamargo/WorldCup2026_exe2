@@ -10,10 +10,12 @@ from openpyxl import load_workbook
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from polla.config import config_path, data_path, load_json, output_path
+from polla.models import MatchResult
 from polla.results import load_confirmed_results
 from polla.schedule import load_schedule
 from polla.store import hash_pin
 from polla.supabase_store import SupabaseStore
+from polla.timeutils import as_bogota, parse_datetime
 
 
 def parse_args() -> argparse.Namespace:
@@ -49,7 +51,7 @@ def main() -> int:
     })
     store.replace_rows("users", users)
     store.replace_rows("matches", [_match_row(match) for match in load_schedule(config_path("calendario_partidos.json"))])
-    store.replace_rows("results", [_result_row(result) for result in _dedupe_results(load_confirmed_results(data_path("resultados", "resultados_confirmados.csv")))])
+    store.replace_rows("results", [_result_row(result) for result in _dedupe_results(_load_initial_results())])
     store.replace_rows("settings", _initial_settings())
     ranking_rows = _ranking_rows(output_path("ranking_polla.xlsx"))
     if ranking_rows:
@@ -93,6 +95,29 @@ def _dedupe_results(results) -> list:
     for result in results:
         by_id[result.match_id] = result
     return list(by_id.values())
+
+
+def _load_initial_results() -> list[MatchResult]:
+    tracked_path = config_path("resultados_iniciales.json")
+    if tracked_path.exists():
+        payload = load_json(tracked_path)
+        return [
+            MatchResult(
+                match_id=item["match_id"],
+                team_a=item["team_a"],
+                team_b=item["team_b"],
+                goals_a_real=item.get("goals_a_real"),
+                goals_b_real=item.get("goals_b_real"),
+                status=item.get("status", "final"),
+                phase=item.get("phase"),
+                kickoff_at=as_bogota(parse_datetime(item.get("kickoff_at"))),
+                source=item.get("source"),
+                source_url=item.get("source_url"),
+                confirmed=bool(item.get("confirmed", False)),
+            )
+            for item in payload.get("results", [])
+        ]
+    return load_confirmed_results(data_path("resultados", "resultados_confirmados.csv"))
 
 
 def _initial_settings() -> list[dict]:

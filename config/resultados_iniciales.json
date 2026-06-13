@@ -1,0 +1,56 @@
+{
+  "results": [
+    {
+      "match_id": "M001",
+      "team_a": "Mexico",
+      "team_b": "South Africa",
+      "goals_a_real": 2,
+      "goals_b_real": 0,
+      "status": "final",
+      "phase": "Group A",
+      "kickoff_at": "2026-06-11T14:00:00-05:00",
+      "source": "Guardian",
+      "source_url": "https://www.theguardian.com/football/2026/jun/11/mexico-south-africa-world-cup-2026-group-a-match-report",
+      "confirmed": true
+    },
+    {
+      "match_id": "M002",
+      "team_a": "South Korea",
+      "team_b": "Czech Republic",
+      "goals_a_real": 2,
+      "goals_b_real": 1,
+      "status": "final",
+      "phase": "Group A",
+      "kickoff_at": "2026-06-11T21:00:00-05:00",
+      "source": "AP",
+      "source_url": "https://apnews.com/article/496e7772dde95ca0af90b5074fdb13d9",
+      "confirmed": true
+    },
+    {
+      "match_id": "M003",
+      "team_a": "Canada",
+      "team_b": "Bosnia and Herzegovina",
+      "goals_a_real": 1,
+      "goals_b_real": 1,
+      "status": "final",
+      "phase": "Group B",
+      "kickoff_at": "2026-06-12T14:00:00-05:00",
+      "source": "Guardian",
+      "source_url": "https://www.theguardian.com/football/2026/jun/12/canada-bosnia-herzegovina-world-cup-2026-group-b-match-report",
+      "confirmed": true
+    },
+    {
+      "match_id": "M004",
+      "team_a": "United States",
+      "team_b": "Paraguay",
+      "goals_a_real": 4,
+      "goals_b_real": 1,
+      "status": "final",
+      "phase": "Group D",
+      "kickoff_at": "2026-06-12T20:00:00-05:00",
+      "source": "AP",
+      "source_url": "https://apnews.com/article/46d54749fcebbf18100fa901d56c4119",
+      "confirmed": true
+    }
+  ]
+}
