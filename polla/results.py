@@ -100,8 +100,12 @@ def fetch_wikipedia_results(source_cfg: dict) -> list[MatchResult]:
 def update_results_from_sources(schedule: list[MatchResult], existing: list[MatchResult], cfg: dict) -> tuple[list[MatchResult], list[str]]:
     existing_by_id = {r.match_id: r for r in existing}
     warnings: list[str] = []
-    candidates: list[MatchResult] = []
-    due = [m for m in schedule if should_check_result(m, cfg)]
+    candidates: list[MatchResult] = _manual_result_candidates(cfg)
+    manual_ids = {candidate.match_id for candidate in candidates if candidate.match_id}
+    due = [
+        match for match in schedule
+        if should_check_result(match, cfg) or _manual_result_is_pending(match, manual_ids, existing_by_id)
+    ]
     if not due:
         return existing, warnings
     for source in cfg.get("sources", []):
@@ -151,6 +155,30 @@ def _parse_score_lines(text: str, source: str, url: str) -> list[MatchResult]:
             confirmed=True,
         ))
     return results
+
+
+def _manual_result_candidates(cfg: dict) -> list[MatchResult]:
+    candidates: list[MatchResult] = []
+    for item in cfg.get("manual_results", []):
+        if not item.get("confirmed", True):
+            continue
+        candidates.append(MatchResult(
+            match_id=item.get("match_id", ""),
+            team_a=item["team_a"],
+            team_b=item["team_b"],
+            goals_a_real=_to_int(item.get("goals_a_real")),
+            goals_b_real=_to_int(item.get("goals_b_real")),
+            status=item.get("status", "final"),
+            source=item.get("source"),
+            source_url=item.get("source_url"),
+            confirmed=True,
+        ))
+    return candidates
+
+
+def _manual_result_is_pending(match: MatchResult, manual_ids: set[str], existing_by_id: dict[str, MatchResult]) -> bool:
+    existing = existing_by_id.get(match.match_id)
+    return match.match_id in manual_ids and not (existing and existing.confirmed)
 
 
 def _find_candidate(match: MatchResult, candidates: list[MatchResult]) -> MatchResult | None:

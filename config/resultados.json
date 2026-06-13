@@ -3,7 +3,7 @@
   "schedule_cache_hours": 24,
   "result_first_check_minutes_after_expected_end": 15,
   "result_retry_minutes": 10,
-  "result_timeout_hours_after_kickoff": 4,
+  "result_timeout_hours_after_kickoff": 24,
   "group_stage_expected_minutes": 120,
   "knockout_expected_minutes": 180,
   "sources": [
@@ -12,6 +12,91 @@
       "type": "wikipedia_tables",
       "url": "https://en.wikipedia.org/wiki/2026_FIFA_World_Cup",
       "enabled": true
+    },
+    {
+      "name": "wikipedia_group_a",
+      "type": "wikipedia_tables",
+      "url": "https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_Group_A",
+      "enabled": true
+    },
+    {
+      "name": "wikipedia_group_b",
+      "type": "wikipedia_tables",
+      "url": "https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_Group_B",
+      "enabled": true
+    },
+    {
+      "name": "wikipedia_group_c",
+      "type": "wikipedia_tables",
+      "url": "https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_Group_C",
+      "enabled": true
+    },
+    {
+      "name": "wikipedia_group_d",
+      "type": "wikipedia_tables",
+      "url": "https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_Group_D",
+      "enabled": true
+    },
+    {
+      "name": "wikipedia_group_e",
+      "type": "wikipedia_tables",
+      "url": "https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_Group_E",
+      "enabled": true
+    },
+    {
+      "name": "wikipedia_group_f",
+      "type": "wikipedia_tables",
+      "url": "https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_Group_F",
+      "enabled": true
+    },
+    {
+      "name": "wikipedia_group_g",
+      "type": "wikipedia_tables",
+      "url": "https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_Group_G",
+      "enabled": true
+    },
+    {
+      "name": "wikipedia_group_h",
+      "type": "wikipedia_tables",
+      "url": "https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_Group_H",
+      "enabled": true
+    },
+    {
+      "name": "wikipedia_group_i",
+      "type": "wikipedia_tables",
+      "url": "https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_Group_I",
+      "enabled": true
+    },
+    {
+      "name": "wikipedia_group_j",
+      "type": "wikipedia_tables",
+      "url": "https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_Group_J",
+      "enabled": true
+    },
+    {
+      "name": "wikipedia_group_k",
+      "type": "wikipedia_tables",
+      "url": "https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_Group_K",
+      "enabled": true
+    },
+    {
+      "name": "wikipedia_group_l",
+      "type": "wikipedia_tables",
+      "url": "https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_Group_L",
+      "enabled": true
+    }
+  ],
+  "manual_results": [
+    {
+      "match_id": "M005",
+      "team_a": "Qatar",
+      "team_b": "Switzerland",
+      "goals_a_real": 1,
+      "goals_b_real": 1,
+      "status": "final",
+      "source": "The Guardian",
+      "source_url": "https://www.theguardian.com/football/live/2026/jun/13/qatar-v-switzerland-world-cup-2026-live",
+      "confirmed": true
     }
   ]
 }
