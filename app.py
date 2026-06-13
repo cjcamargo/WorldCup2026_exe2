@@ -18,6 +18,58 @@ from polla.timeutils import BOGOTA, now_bogota
 st.set_page_config(page_title="Polla Mundialista", page_icon="1:2", layout="wide")
 
 
+TEAM_FLAGS = {
+    "Algeria": "🇩🇿",
+    "Argentina": "🇦🇷",
+    "Australia": "🇦🇺",
+    "Austria": "🇦🇹",
+    "Belgium": "🇧🇪",
+    "Bosnia and Herzegovina": "🇧🇦",
+    "Brazil": "🇧🇷",
+    "Cabo Verde": "🇨🇻",
+    "Canada": "🇨🇦",
+    "Colombia": "🇨🇴",
+    "Croatia": "🇭🇷",
+    "Curaçao": "🇨🇼",
+    "Czech Republic": "🇨🇿",
+    "Côte d'Ivoire": "🇨🇮",
+    "DR Congo": "🇨🇩",
+    "Ecuador": "🇪🇨",
+    "Egypt": "🇪🇬",
+    "England": "🏴",
+    "France": "🇫🇷",
+    "Germany": "🇩🇪",
+    "Ghana": "🇬🇭",
+    "Haiti": "🇭🇹",
+    "IR Iran": "🇮🇷",
+    "Iraq": "🇮🇶",
+    "Japan": "🇯🇵",
+    "Jordan": "🇯🇴",
+    "Mexico": "🇲🇽",
+    "Morocco": "🇲🇦",
+    "Netherlands": "🇳🇱",
+    "New Zealand": "🇳🇿",
+    "Norway": "🇳🇴",
+    "Panama": "🇵🇦",
+    "Paraguay": "🇵🇾",
+    "Portugal": "🇵🇹",
+    "Qatar": "🇶🇦",
+    "Saudi Arabia": "🇸🇦",
+    "Scotland": "🏴",
+    "Senegal": "🇸🇳",
+    "South Africa": "🇿🇦",
+    "South Korea": "🇰🇷",
+    "Spain": "🇪🇸",
+    "Sweden": "🇸🇪",
+    "Switzerland": "🇨🇭",
+    "Tunisia": "🇹🇳",
+    "Türkiye": "🇹🇷",
+    "United States": "🇺🇸",
+    "Uruguay": "🇺🇾",
+    "Uzbekistan": "🇺🇿",
+}
+
+
 @st.cache_resource(ttl=300)
 def get_store() -> SupabaseStore:
     supabase_cfg = st.secrets.get("supabase", {})
@@ -47,6 +99,7 @@ def load_state() -> dict[str, Any]:
 
 
 def main() -> None:
+    inject_styles()
     st.title("Polla Mundialista")
     if "participant" not in st.session_state:
         login()
@@ -106,28 +159,23 @@ def match_predictions_view(participant: str, state: dict[str, Any]) -> None:
     for match in state["matches"]:
         matches_by_phase[match.phase or "Sin fase"].append(match)
 
-    for phase, matches in sorted(matches_by_phase.items()):
-        st.subheader(phase)
-        for match in sorted(matches, key=lambda item: item.kickoff_at or datetime.max.replace(tzinfo=BOGOTA)):
-            pred = predictions.get((participant, match.match_id))
-            locked = bool(match.kickoff_at and now >= match.kickoff_at)
-            label = f"{match.match_id} | {match.team_a} vs {match.team_b}"
-            caption = match.kickoff_at.strftime("%Y-%m-%d %H:%M") if match.kickoff_at else "Horario por definir"
-            with st.form(f"pred_{match.match_id}"):
-                st.markdown(f"**{label}**")
-                st.caption(caption + (" | Cerrado" if locked else ""))
-                col_a, col_b, col_save = st.columns([1, 1, 1])
-                goals_a = col_a.number_input(match.team_a, min_value=0, max_value=20, value=_default_int(pred.goals_a_pred if pred else None), step=1, disabled=locked)
-                goals_b = col_b.number_input(match.team_b, min_value=0, max_value=20, value=_default_int(pred.goals_b_pred if pred else None), step=1, disabled=locked)
-                submitted = col_save.form_submit_button("Guardar", disabled=locked)
-            if submitted:
-                try:
-                    store.save_prediction(participant, match, int(goals_a), int(goals_b), now)
-                    load_state.clear()
-                    st.success("Marcador guardado.")
-                    st.rerun()
-                except ValueError as exc:
-                    st.error(str(exc))
+    phases = sorted(matches_by_phase)
+    selected_phase = st.selectbox("Grupo o fase", phases, key="match_phase_filter")
+    selected_matches = sorted(matches_by_phase[selected_phase], key=lambda item: item.kickoff_at or datetime.max.replace(tzinfo=BOGOTA))
+    participant_predictions = [pred for pred in state["predictions"] if pred.participant == participant]
+    saved_count = len({pred.match_id for pred in participant_predictions if pred.goals_a_pred is not None and pred.goals_b_pred is not None})
+    open_count = sum(1 for match in state["matches"] if not match.kickoff_at or now < match.kickoff_at)
+    locked_count = len(state["matches"]) - open_count
+
+    metric_cols = st.columns(3)
+    metric_cols[0].metric("Marcadores guardados", saved_count)
+    metric_cols[1].metric("Partidos abiertos", open_count)
+    metric_cols[2].metric("Partidos cerrados", locked_count)
+
+    grid = st.columns(2)
+    for idx, match in enumerate(selected_matches):
+        with grid[idx % 2]:
+            _match_prediction_card(store, participant, match, predictions.get((participant, match.match_id)), now)
 
 
 def group_picks_view(participant: str, state: dict[str, Any]) -> None:
@@ -251,12 +299,73 @@ def _score_state(state: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict
     )
 
 
+def _match_prediction_card(
+    store: SupabaseStore,
+    participant: str,
+    match: MatchResult,
+    pred: Any,
+    now: datetime,
+) -> None:
+    locked = bool(match.kickoff_at and now >= match.kickoff_at)
+    caption = match.kickoff_at.strftime("%Y-%m-%d %H:%M") if match.kickoff_at else "Horario por definir"
+    status = "Cerrado" if locked else "Abierto"
+    with st.container(border=True):
+        st.markdown(
+            f"""
+            <div class="match-head">
+              <span class="match-id">{match.match_id}</span>
+              <span class="match-status {'locked' if locked else 'open'}">{status}</span>
+            </div>
+            <div class="match-title">
+              <span>{_team_label(match.team_a)}</span>
+              <span class="versus">vs</span>
+              <span>{_team_label(match.team_b)}</span>
+            </div>
+            <div class="match-time">{caption}</div>
+            """,
+            unsafe_allow_html=True,
+        )
+        with st.form(f"pred_{match.match_id}"):
+            col_a, col_b, col_save = st.columns([1, 1, 0.9], vertical_alignment="bottom")
+            goals_a = col_a.number_input(
+                _team_label(match.team_a),
+                min_value=0,
+                max_value=20,
+                value=_default_int(pred.goals_a_pred if pred else None),
+                step=1,
+                disabled=locked,
+                key=f"{match.match_id}_a",
+            )
+            goals_b = col_b.number_input(
+                _team_label(match.team_b),
+                min_value=0,
+                max_value=20,
+                value=_default_int(pred.goals_b_pred if pred else None),
+                step=1,
+                disabled=locked,
+                key=f"{match.match_id}_b",
+            )
+            submitted = col_save.form_submit_button("Guardar", disabled=locked, use_container_width=True)
+        if submitted:
+            try:
+                store.save_prediction(participant, match, int(goals_a), int(goals_b), now)
+                load_state.clear()
+                st.success("Marcador guardado.")
+                st.rerun()
+            except ValueError as exc:
+                st.error(str(exc))
+
+
 def _teams_by_group(matches: list[MatchResult]) -> dict[str, list[str]]:
     groups: dict[str, set[str]] = defaultdict(set)
     for match in matches:
         if match.phase and "group" in match.phase.casefold():
             groups[match.phase].update([match.team_a, match.team_b])
     return {group: sorted(teams) for group, teams in groups.items()}
+
+
+def _team_label(team: str) -> str:
+    return f"{TEAM_FLAGS.get(team, '🏳️')} {team}"
 
 
 def _default_int(value: int | None) -> int:
@@ -270,6 +379,86 @@ def _index(options: list[str], value: str | None) -> int:
 def _fit_detail_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     headers = ["participant", "match_id", "team_a", "team_b", "pred_score", "real_score", "points"]
     return [{header: row.get(header, "") for header in headers} for row in rows]
+
+
+def inject_styles() -> None:
+    st.markdown(
+        """
+        <style>
+        .block-container {
+            max-width: 1280px;
+            padding-top: 2rem;
+        }
+        div[data-testid="stMetric"] {
+            background: #f8fafc;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 0.7rem 0.85rem;
+        }
+        .match-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.4rem;
+        }
+        .match-id {
+            color: #64748b;
+            font-size: 0.78rem;
+            font-weight: 700;
+        }
+        .match-status {
+            border-radius: 999px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 0.16rem 0.5rem;
+        }
+        .match-status.open {
+            background: #dcfce7;
+            color: #166534;
+        }
+        .match-status.locked {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .match-title {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+            align-items: center;
+            gap: 0.45rem;
+            font-size: 0.98rem;
+            font-weight: 750;
+            line-height: 1.2;
+        }
+        .match-title span {
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+        .match-title span:last-child {
+            text-align: right;
+        }
+        .versus {
+            color: #94a3b8;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+        }
+        .match-time {
+            color: #64748b;
+            font-size: 0.8rem;
+            margin: 0.35rem 0 0.55rem;
+        }
+        @media (max-width: 760px) {
+            .match-title {
+                grid-template-columns: 1fr;
+            }
+            .match-title span:last-child {
+                text-align: left;
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 if __name__ == "__main__":
