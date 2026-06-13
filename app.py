@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 from collections import defaultdict
 from datetime import datetime
+from html import escape
 from pathlib import Path
 from typing import Any
 
@@ -23,55 +24,55 @@ st.set_page_config(page_title="Polla Mundialista", page_icon="1:2", layout="wide
 LOGO_PATH = Path(__file__).parent / "assets" / "exe2_logo.png"
 
 
-TEAM_FLAGS = {
-    "Algeria": "🇩🇿",
-    "Argentina": "🇦🇷",
-    "Australia": "🇦🇺",
-    "Austria": "🇦🇹",
-    "Belgium": "🇧🇪",
-    "Bosnia and Herzegovina": "🇧🇦",
-    "Brazil": "🇧🇷",
-    "Cabo Verde": "🇨🇻",
-    "Canada": "🇨🇦",
-    "Colombia": "🇨🇴",
-    "Croatia": "🇭🇷",
-    "Curaçao": "🇨🇼",
-    "Czech Republic": "🇨🇿",
-    "Côte d'Ivoire": "🇨🇮",
-    "DR Congo": "🇨🇩",
-    "Ecuador": "🇪🇨",
-    "Egypt": "🇪🇬",
-    "England": "🏴",
-    "France": "🇫🇷",
-    "Germany": "🇩🇪",
-    "Ghana": "🇬🇭",
-    "Haiti": "🇭🇹",
-    "IR Iran": "🇮🇷",
-    "Iraq": "🇮🇶",
-    "Japan": "🇯🇵",
-    "Jordan": "🇯🇴",
-    "Mexico": "🇲🇽",
-    "Morocco": "🇲🇦",
-    "Netherlands": "🇳🇱",
-    "New Zealand": "🇳🇿",
-    "Norway": "🇳🇴",
-    "Panama": "🇵🇦",
-    "Paraguay": "🇵🇾",
-    "Portugal": "🇵🇹",
-    "Qatar": "🇶🇦",
-    "Saudi Arabia": "🇸🇦",
-    "Scotland": "🏴",
-    "Senegal": "🇸🇳",
-    "South Africa": "🇿🇦",
-    "South Korea": "🇰🇷",
-    "Spain": "🇪🇸",
-    "Sweden": "🇸🇪",
-    "Switzerland": "🇨🇭",
-    "Tunisia": "🇹🇳",
-    "Türkiye": "🇹🇷",
-    "United States": "🇺🇸",
-    "Uruguay": "🇺🇾",
-    "Uzbekistan": "🇺🇿",
+TEAM_CODES = {
+    "Algeria": "dz",
+    "Argentina": "ar",
+    "Australia": "au",
+    "Austria": "at",
+    "Belgium": "be",
+    "Bosnia and Herzegovina": "ba",
+    "Brazil": "br",
+    "Cabo Verde": "cv",
+    "Canada": "ca",
+    "Colombia": "co",
+    "Croatia": "hr",
+    "Curaçao": "cw",
+    "Czech Republic": "cz",
+    "Côte d'Ivoire": "ci",
+    "DR Congo": "cd",
+    "Ecuador": "ec",
+    "Egypt": "eg",
+    "England": "gb-eng",
+    "France": "fr",
+    "Germany": "de",
+    "Ghana": "gh",
+    "Haiti": "ht",
+    "IR Iran": "ir",
+    "Iraq": "iq",
+    "Japan": "jp",
+    "Jordan": "jo",
+    "Mexico": "mx",
+    "Morocco": "ma",
+    "Netherlands": "nl",
+    "New Zealand": "nz",
+    "Norway": "no",
+    "Panama": "pa",
+    "Paraguay": "py",
+    "Portugal": "pt",
+    "Qatar": "qa",
+    "Saudi Arabia": "sa",
+    "Scotland": "gb-sct",
+    "Senegal": "sn",
+    "South Africa": "za",
+    "South Korea": "kr",
+    "Spain": "es",
+    "Sweden": "se",
+    "Switzerland": "ch",
+    "Tunisia": "tn",
+    "Türkiye": "tr",
+    "United States": "us",
+    "Uruguay": "uy",
+    "Uzbekistan": "uz",
 }
 
 
@@ -119,22 +120,24 @@ def main() -> None:
         st.session_state.clear()
         st.rerun()
 
-    tabs = ["Mis marcadores", "Top 3 grupos", "Finales", "Ranking", "Detalle"]
+    tabs = ["Mis marcadores", "Resultados", "Top 3 grupos", "Finales", "Ranking", "Detalle"]
     if role == "admin":
         tabs.append("Admin")
     rendered_tabs = st.tabs(tabs)
     with rendered_tabs[0]:
         match_predictions_view(participant, state)
     with rendered_tabs[1]:
-        group_picks_view(participant, state)
+        results_view(state)
     with rendered_tabs[2]:
-        final_picks_view(participant, state)
+        group_picks_view(participant, state)
     with rendered_tabs[3]:
-        ranking_view(state)
+        final_picks_view(participant, state)
     with rendered_tabs[4]:
+        ranking_view(state)
+    with rendered_tabs[5]:
         detail_view(state)
     if role == "admin":
-        with rendered_tabs[5]:
+        with rendered_tabs[6]:
             admin_view(state)
 
 
@@ -254,6 +257,40 @@ def ranking_view(state: dict[str, Any]) -> None:
     st.dataframe(pd.DataFrame(ranking), hide_index=True, use_container_width=True)
 
 
+def results_view(state: dict[str, Any]) -> None:
+    results = sorted(
+        [result for result in state["results"] if result.confirmed],
+        key=lambda item: item.kickoff_at or datetime.max.replace(tzinfo=BOGOTA),
+    )
+    if not results:
+        st.info("Todavía no hay resultados reales confirmados.")
+        return
+
+    st.caption(f"Resultados confirmados: {len(results)}")
+    for result in results:
+        score = _score_text(result.goals_a_real, result.goals_b_real)
+        kickoff = result.kickoff_at.strftime("%Y-%m-%d %H:%M") if result.kickoff_at else "Horario por definir"
+        source = result.source or "Automático"
+        with st.container(border=True):
+            st.markdown(
+                f"""
+                <div class="result-row">
+                  <div>
+                    <div class="match-id">{result.match_id} · {result.phase or "Sin fase"}</div>
+                    <div class="result-title">
+                      <span>{_team_html(result.team_a)}</span>
+                      <strong>{score}</strong>
+                      <span>{_team_html(result.team_b)}</span>
+                    </div>
+                    <div class="match-time">{kickoff} · Fuente: {source}</div>
+                  </div>
+                  <span class="match-status open">Confirmado</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+
 def detail_view(state: dict[str, Any]) -> None:
     _ranking, detail = _score_state(state)
     if not detail:
@@ -339,9 +376,9 @@ def _match_prediction_card(
               <span class="match-status {'locked' if locked else 'open'}">{status}</span>
             </div>
             <div class="match-title">
-              <span>{_team_label(match.team_a)}</span>
+              <span>{_team_html(match.team_a)}</span>
               <span class="versus">vs</span>
-              <span>{_team_label(match.team_b)}</span>
+              <span>{_team_html(match.team_b)}</span>
             </div>
             <div class="match-time">{caption}</div>
             """,
@@ -350,7 +387,7 @@ def _match_prediction_card(
         with st.form(f"pred_{match.match_id}"):
             col_a, col_b, col_save = st.columns([1, 1, 0.9], vertical_alignment="bottom")
             goals_a = col_a.number_input(
-                _team_label(match.team_a),
+                match.team_a,
                 min_value=0,
                 max_value=20,
                 value=_default_int(pred.goals_a_pred if pred else None),
@@ -359,7 +396,7 @@ def _match_prediction_card(
                 key=f"{match.match_id}_a",
             )
             goals_b = col_b.number_input(
-                _team_label(match.team_b),
+                match.team_b,
                 min_value=0,
                 max_value=20,
                 value=_default_int(pred.goals_b_pred if pred else None),
@@ -386,8 +423,18 @@ def _teams_by_group(matches: list[MatchResult]) -> dict[str, list[str]]:
     return {group: sorted(teams) for group, teams in groups.items()}
 
 
-def _team_label(team: str) -> str:
-    return f"{TEAM_FLAGS.get(team, '🏳️')} {team}"
+def _team_html(team: str) -> str:
+    code = TEAM_CODES.get(team)
+    safe_team = escape(team)
+    if not code:
+        return safe_team
+    return f'<span class="team-with-flag"><img src="https://flagcdn.com/{code}.svg" alt="" loading="lazy" />{safe_team}</span>'
+
+
+def _score_text(goals_a: int | None, goals_b: int | None) -> str:
+    if goals_a is None or goals_b is None:
+        return "- : -"
+    return f"{goals_a} - {goals_b}"
 
 
 def _default_int(value: int | None) -> int:
@@ -544,6 +591,20 @@ def inject_styles() -> None:
         .match-title span:last-child {
             text-align: right;
         }
+        .team-with-flag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.42rem;
+            min-width: 0;
+        }
+        .team-with-flag img {
+            width: 24px;
+            height: 18px;
+            border-radius: 2px;
+            object-fit: cover;
+            box-shadow: 0 0 0 1px rgba(16,37,26,0.12);
+            flex: 0 0 auto;
+        }
         .versus {
             color: var(--exe-red);
             font-size: 0.75rem;
@@ -554,6 +615,33 @@ def inject_styles() -> None:
             color: #64748b;
             font-size: 0.8rem;
             margin: 0.35rem 0 0.55rem;
+        }
+        .result-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+        .result-title {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+            align-items: center;
+            gap: 1rem;
+            margin-top: 0.35rem;
+            font-size: 1.05rem;
+            font-weight: 800;
+        }
+        .result-title strong {
+            color: var(--exe-ink);
+            background: #f8fafc;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 0.25rem 0.65rem;
+            white-space: nowrap;
+        }
+        .result-title span:last-child {
+            justify-content: flex-end;
+            text-align: right;
         }
         @media (max-width: 760px) {
             .app-hero {
@@ -570,6 +658,18 @@ def inject_styles() -> None:
                 grid-template-columns: 1fr;
             }
             .match-title span:last-child {
+                text-align: left;
+            }
+            .result-row {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+            .result-title {
+                grid-template-columns: 1fr;
+                gap: 0.4rem;
+            }
+            .result-title span:last-child {
+                justify-content: flex-start;
                 text-align: left;
             }
         }
