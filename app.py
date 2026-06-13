@@ -418,58 +418,50 @@ def inject_styles() -> None:
             --exe-border: #d7e0ea;
         }
         .stApp {
-            background:
-                radial-gradient(circle at 12% 0%, rgba(24,163,92,0.18), transparent 30%),
-                radial-gradient(circle at 88% 8%, rgba(23,78,166,0.10), transparent 28%),
-                linear-gradient(90deg, rgba(15,122,69,0.08) 1px, transparent 1px),
-                linear-gradient(180deg, rgba(15,122,69,0.07) 1px, transparent 1px),
-                linear-gradient(135deg, #fbfffd 0%, #eef8f1 52%, #f8fbff 100%);
-            background-size: 44px 44px, 44px 44px, auto;
+            background: #ffffff;
             color: var(--exe-ink);
         }
         .block-container {
             max-width: 1280px;
-            padding-top: 2rem;
+            padding-top: 1.1rem;
             padding-bottom: 3rem;
         }
         .app-hero {
             display: grid;
-            grid-template-columns: minmax(260px, 420px) 1fr;
+            grid-template-columns: 136px 1fr;
             align-items: center;
-            gap: 1.6rem;
-            margin-bottom: 1rem;
-            padding: 1rem;
+            gap: 1.2rem;
+            margin-bottom: 0.7rem;
+            padding: 0.7rem 0.9rem;
             border-radius: 12px;
-            background:
-                radial-gradient(circle at 82% 12%, rgba(255,255,255,0.26), transparent 30%),
-                linear-gradient(135deg, rgba(15,122,69,0.96), rgba(28,147,82,0.92)),
-                repeating-linear-gradient(90deg, transparent 0 42px, rgba(255,255,255,0.09) 42px 44px);
-            border: 1px solid rgba(255,255,255,0.58);
-            box-shadow: 0 18px 42px rgba(15, 122, 69, 0.22);
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-left: 8px solid var(--exe-grass);
+            box-shadow: 0 8px 24px rgba(16, 37, 26, 0.08);
         }
         .hero-logo {
-            border-radius: 18px;
-            background: rgba(255,255,255,0.96);
-            padding: 0.65rem;
-            box-shadow: 0 16px 34px rgba(16,37,26,0.22);
+            border-radius: 10px;
+            background: #ffffff;
+            padding: 0;
+            box-shadow: none;
         }
         .hero-logo img {
             display: block;
-            width: min(100%, 420px);
+            width: 124px;
             height: auto;
-            border-radius: 14px;
+            border-radius: 10px;
         }
         .hero-copy h1 {
             margin: 0;
-            color: #ffffff;
-            font-size: clamp(2rem, 4vw, 4.6rem);
-            line-height: 0.98;
+            color: var(--exe-ink);
+            font-size: clamp(1.7rem, 3vw, 2.8rem);
+            line-height: 1.04;
             font-weight: 900;
         }
         .hero-copy p {
-            margin: 0.8rem 0 0;
-            color: #fff4b8;
-            font-size: 1.08rem;
+            margin: 0.35rem 0 0;
+            color: #38634c;
+            font-size: 0.98rem;
             font-weight: 650;
         }
         .stTabs [data-baseweb="tab-list"] {
@@ -566,10 +558,13 @@ def inject_styles() -> None:
         @media (max-width: 760px) {
             .app-hero {
                 grid-template-columns: 1fr;
-                gap: 1rem;
+                gap: 0.65rem;
+            }
+            .hero-logo img {
+                width: 104px;
             }
             .hero-copy h1 {
-                font-size: 2.2rem;
+                font-size: 1.8rem;
             }
             .match-title {
                 grid-template-columns: 1fr;
