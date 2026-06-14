@@ -49,7 +49,17 @@ def main() -> int:
         "role": "admin",
         "active": True,
     })
-    store.replace_rows("users", users)
+    store.client.table("users").upsert(users).execute()
+    group = store.group_by_invite_code("EXE2")
+    if group is None:
+        group = store.create_group("Exe2", "EXE2", "admin")
+    for user in users:
+        store.create_membership(
+            group.group_id,
+            user["participant"],
+            role="admin" if user["participant"] == "admin" else "player",
+            status="active",
+        )
     store.replace_rows("matches", [_match_row(match) for match in load_schedule(config_path("calendario_partidos.json"))])
     store.replace_rows("results", [_result_row(result) for result in _dedupe_results(_load_initial_results())])
     store.replace_rows("settings", _initial_settings())

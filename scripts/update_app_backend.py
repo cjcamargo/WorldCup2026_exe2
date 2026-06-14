@@ -38,13 +38,25 @@ def main() -> int:
     predictions = store.predictions()
     group_picks = store.group_picks()
     final_picks = store.final_picks()
+    groups = store.groups()
+    memberships = store.memberships()
     points = load_json(config_path("puntajes.json"))
     final_results = {
         "champion": settings.get("actual_champion") or None,
         "runner_up": settings.get("actual_runner_up") or None,
         "third_place": settings.get("actual_third_place") or None,
     }
-    ranking, detail = score_all(predictions, updated_results, final_picks, final_results, group_picks, matches, points)
+    ranking, detail = _score_rows_by_group(
+        groups,
+        memberships,
+        predictions,
+        updated_results,
+        final_picks,
+        final_results,
+        group_picks,
+        matches,
+        points,
+    )
 
     audit_changes = store.audit_changes_after(settings.get("last_audit_email_at"))
     email_logs: list[str] = []
@@ -115,8 +127,42 @@ def _result_row(result: MatchResult) -> dict[str, Any]:
 
 
 def _fit_detail_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    headers = ["participant", "match_id", "team_a", "team_b", "pred_score", "real_score", "points"]
+    headers = ["group_id", "participant", "match_id", "team_a", "team_b", "pred_score", "real_score", "points"]
     return [{header: row.get(header, "") for header in headers} for row in rows]
+
+
+def _score_rows_by_group(
+    groups: list[Any],
+    memberships: list[Any],
+    predictions: list[Any],
+    results: list[MatchResult],
+    final_picks: list[Any],
+    final_results: dict[str, str | None],
+    group_picks: list[Any],
+    matches: list[MatchResult],
+    points: dict[str, int],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    ranking, detail = score_all(predictions, results, final_picks, final_results, group_picks, matches, points)
+    if not groups:
+        return ranking, detail
+    ranking_rows: list[dict[str, Any]] = []
+    detail_rows: list[dict[str, Any]] = []
+    for group in groups:
+        if not getattr(group, "active", True):
+            continue
+        participants = {
+            membership.participant
+            for membership in memberships
+            if membership.group_id == group.group_id and membership.status == "active"
+        }
+        group_ranking = [dict(row) for row in ranking if row.get("participant") in participants]
+        for idx, row in enumerate(group_ranking, start=1):
+            row["rank"] = idx
+            ranking_rows.append({"group_id": group.group_id, **row})
+        for row in detail:
+            if row.get("participant") in participants:
+                detail_rows.append({"group_id": group.group_id, **row})
+    return ranking_rows, detail_rows
 
 
 if __name__ == "__main__":

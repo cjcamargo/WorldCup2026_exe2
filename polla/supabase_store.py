@@ -4,7 +4,7 @@ from dataclasses import asdict
 from datetime import datetime
 from typing import Any
 
-from .models import AuditChange, FinalPicks, GroupPick, MatchResult, Prediction, User
+from .models import AuditChange, FinalPicks, GroupMembership, GroupPick, MatchResult, PollaGroup, Prediction, User
 from .schedule import canonical_team_name
 from .timeutils import as_bogota, parse_datetime
 
@@ -43,6 +43,99 @@ class SupabaseStore:
 
     def set_user_active(self, participant: str, active: bool) -> None:
         self.client.table("users").update({"active": active}).eq("participant", participant).execute()
+
+    def groups(self) -> list[PollaGroup]:
+        rows = self._select("polla_groups", order="name")
+        return [
+            PollaGroup(
+                group_id=row["group_id"],
+                name=row["name"],
+                invite_code=row["invite_code"],
+                created_by=row["created_by"],
+                active=bool(row.get("active", True)),
+            )
+            for row in rows
+        ]
+
+    def memberships(
+        self,
+        participant: str | None = None,
+        group_id: str | None = None,
+        status: str | None = None,
+    ) -> list[GroupMembership]:
+        query = self.client.table("group_memberships").select("*")
+        if participant:
+            query = query.eq("participant", participant)
+        if group_id:
+            query = query.eq("group_id", group_id)
+        if status:
+            query = query.eq("status", status)
+        rows = query.execute().data or []
+        return [
+            GroupMembership(
+                group_id=row["group_id"],
+                participant=row["participant"],
+                role=row.get("role") or "player",
+                status=row.get("status") or "pending",
+            )
+            for row in rows
+        ]
+
+    def group_by_invite_code(self, invite_code: str) -> PollaGroup | None:
+        rows = (
+            self.client.table("polla_groups")
+            .select("*")
+            .eq("invite_code", invite_code.strip().upper())
+            .limit(1)
+            .execute()
+            .data
+            or []
+        )
+        if not rows:
+            return None
+        row = rows[0]
+        return PollaGroup(
+            group_id=row["group_id"],
+            name=row["name"],
+            invite_code=row["invite_code"],
+            created_by=row["created_by"],
+            active=bool(row.get("active", True)),
+        )
+
+    def create_group(self, name: str, invite_code: str, created_by: str) -> PollaGroup:
+        row = {
+            "name": name,
+            "invite_code": invite_code.strip().upper(),
+            "created_by": created_by,
+            "active": True,
+        }
+        data = self.client.table("polla_groups").insert(row).execute().data or []
+        created = data[0] if data else self._one("polla_groups", {"invite_code": row["invite_code"]})
+        if not created:
+            raise RuntimeError("No se pudo crear el grupo.")
+        group = PollaGroup(
+            group_id=created["group_id"],
+            name=created["name"],
+            invite_code=created["invite_code"],
+            created_by=created["created_by"],
+            active=bool(created.get("active", True)),
+        )
+        self.create_membership(group.group_id, created_by, role="admin", status="active")
+        return group
+
+    def create_membership(self, group_id: str, participant: str, role: str = "player", status: str = "pending") -> None:
+        self.client.table("group_memberships").upsert({
+            "group_id": group_id,
+            "participant": participant,
+            "role": role,
+            "status": status,
+        }).execute()
+
+    def set_membership_status(self, group_id: str, participant: str, status: str) -> None:
+        self.client.table("group_memberships").update({"status": status}).eq("group_id", group_id).eq("participant", participant).execute()
+
+    def active_member_count(self, group_id: str) -> int:
+        return len(self.memberships(group_id=group_id, status="active"))
 
     def matches(self) -> list[MatchResult]:
         rows = self._select("matches", order="match_id")

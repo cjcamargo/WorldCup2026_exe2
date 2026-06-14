@@ -47,6 +47,23 @@ class User:
 
 
 @dataclass(frozen=True)
+class PollaGroup:
+    group_id: str
+    name: str
+    invite_code: str
+    created_by: str
+    active: bool = True
+
+
+@dataclass(frozen=True)
+class GroupMembership:
+    group_id: str
+    participant: str
+    role: str = "player"
+    status: str = "pending"
+
+
+@dataclass(frozen=True)
 class MatchResult:
     match_id: str
     team_a: str

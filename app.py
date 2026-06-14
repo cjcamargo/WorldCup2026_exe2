@@ -101,6 +101,8 @@ def load_state() -> dict[str, Any]:
     store = get_store()
     return {
         "users": store.users(),
+        "groups": store.groups(),
+        "memberships": store.memberships(),
         "matches": store.matches(),
         "predictions": store.predictions(),
         "group_picks": store.group_picks(),
@@ -121,15 +123,23 @@ def main() -> None:
     state = load_state()
     participant = st.session_state["participant"]
     role = st.session_state["role"]
-    render_header(participant)
+    active_group = _active_group_for_session(participant, state)
+    render_header(participant, active_group)
     session_col, exit_col = st.columns([1, 0.16], vertical_alignment="center")
-    session_col.markdown(f'<div class="session-chip">Sesion: <strong>{escape(participant)}</strong></div>', unsafe_allow_html=True)
+    session_col.markdown(_session_html(participant, active_group), unsafe_allow_html=True)
     if exit_col.button("Salir", type="secondary", use_container_width=True):
         st.session_state.clear()
         st.rerun()
 
+    if not active_group:
+        st.info("Tu usuario no tiene un grupo activo. Crea un grupo o solicita unirte a uno desde Mi cuenta.")
+        account_view(participant, state, None)
+        return
+
+    _group_selector(participant, state, active_group)
+
     tabs = ["Mis marcadores", "Resultados", "Top 3 grupos", "Finales", "Ranking", "Detalle", "Mi cuenta"]
-    if role == "admin":
+    if role == "admin" or _is_group_admin(participant, active_group.group_id, state):
         tabs.append("Admin")
     rendered_tabs = st.tabs(tabs)
     with rendered_tabs[0]:
@@ -141,19 +151,20 @@ def main() -> None:
     with rendered_tabs[3]:
         final_picks_view(participant, state)
     with rendered_tabs[4]:
-        ranking_view(state)
+        ranking_view(state, active_group.group_id)
     with rendered_tabs[5]:
-        detail_view(state)
+        detail_view(state, active_group.group_id)
     with rendered_tabs[6]:
-        account_view(participant, state)
-    if role == "admin":
+        account_view(participant, state, active_group)
+    if role == "admin" or _is_group_admin(participant, active_group.group_id, state):
         with rendered_tabs[7]:
-            admin_view(state)
+            admin_view(participant, state, active_group)
 
 
-def render_header(participant: str | None = None) -> None:
+def render_header(participant: str | None = None, active_group: Any | None = None) -> None:
     logo_data = base64.b64encode(LOGO_PATH.read_bytes()).decode("ascii")
-    session = f'<span class="header-session">{escape(participant)}</span>' if participant else ""
+    group_label = f" · {escape(active_group.name)}" if active_group else ""
+    session = f'<span class="header-session">{escape(participant)}{group_label}</span>' if participant else ""
     st.markdown(
         f"""
         <section class="app-shell-header">
@@ -195,20 +206,34 @@ def login() -> None:
             new_participant = st.text_input("Nombre corto")
             new_pin = st.text_input("PIN", type="password", key="register_pin")
             confirm_pin = st.text_input("Confirmar PIN", type="password", key="register_confirm_pin")
+            invite_code = st.text_input("Codigo de grupo (opcional)").strip().upper()
             register_submitted = st.form_submit_button("Enviar solicitud")
         if register_submitted:
             cleaned_participant = _clean_participant(new_participant)
             validation_error = _registration_error(cleaned_participant, new_pin, confirm_pin, state["users"])
             if validation_error:
                 st.error(validation_error)
+                if any(user.participant.casefold() == cleaned_participant.casefold() for user in state["users"]):
+                    st.info("Sugerencias disponibles: " + ", ".join(_username_suggestions(cleaned_participant, state["users"])))
                 return
+            invite_group = None
+            if invite_code:
+                invite_group = store.group_by_invite_code(invite_code)
+                if not invite_group:
+                    st.error("El codigo de grupo no existe.")
+                    return
             try:
-                store.create_user(cleaned_participant, hash_pin(cleaned_participant, new_pin), role="player", active=False)
+                store.create_user(cleaned_participant, hash_pin(cleaned_participant, new_pin), role="player", active=True)
+                if invite_group:
+                    store.create_membership(invite_group.group_id, cleaned_participant, role="player", status="pending")
             except Exception:
                 st.error("No se pudo crear la solicitud. Revisa si el nombre ya existe e intenta de nuevo.")
                 return
             load_state.clear()
-            st.success("Solicitud enviada. Un admin debe aprobar tu usuario antes de entrar.")
+            if invite_group:
+                st.success("Usuario creado. Tu solicitud de grupo quedo pendiente de aprobacion.")
+            else:
+                st.success("Usuario creado. Entra y crea un grupo o solicita unirte a uno.")
 
 def match_predictions_view(participant: str, state: dict[str, Any]) -> None:
     store = get_store()
@@ -283,8 +308,8 @@ def final_picks_view(participant: str, state: dict[str, Any]) -> None:
         st.rerun()
 
 
-def ranking_view(state: dict[str, Any]) -> None:
-    ranking, _detail = _score_state(state)
+def ranking_view(state: dict[str, Any], group_id: str) -> None:
+    ranking, _detail = _score_state(state, group_id)
     if not ranking:
         st.info("Todavía no hay puntos calculados.")
         return
@@ -346,8 +371,8 @@ def results_view(state: dict[str, Any]) -> None:
             )
 
 
-def detail_view(state: dict[str, Any]) -> None:
-    _ranking, detail = _score_state(state)
+def detail_view(state: dict[str, Any], group_id: str) -> None:
+    _ranking, detail = _score_state(state, group_id)
     if not detail:
         st.info("Todavía no hay detalle de puntos.")
         return
@@ -382,12 +407,54 @@ def detail_view(state: dict[str, Any]) -> None:
         )
 
 
-def account_view(participant: str, state: dict[str, Any]) -> None:
+def account_view(participant: str, state: dict[str, Any], active_group: Any | None) -> None:
     store = get_store()
     user = _user_by_participant(state["users"], participant)
     if not user:
         st.error("No se encontro el usuario de la sesion.")
         return
+
+    st.markdown('<div class="section-title">Mis grupos</div>', unsafe_allow_html=True)
+    _render_user_groups(participant, state, active_group)
+
+    group_cols = st.columns(2)
+    with group_cols[0]:
+        with st.form("join_group"):
+            invite_code = st.text_input("Codigo de invitacion").strip().upper()
+            join_submitted = st.form_submit_button("Unirme a grupo")
+        if join_submitted:
+            group = store.group_by_invite_code(invite_code)
+            if not group:
+                st.error("El codigo de grupo no existe.")
+            elif _membership_for(participant, group.group_id, state):
+                st.info("Ya tienes una solicitud o membresia en ese grupo.")
+            else:
+                store.create_membership(group.group_id, participant, role="player", status="pending")
+                load_state.clear()
+                st.success("Solicitud enviada al admin del grupo.")
+                st.rerun()
+
+    with group_cols[1]:
+        with st.form("create_group"):
+            group_name = st.text_input("Nombre del grupo")
+            desired_code = st.text_input("Codigo de invitacion").strip().upper()
+            create_submitted = st.form_submit_button("Crear grupo")
+        if create_submitted:
+            cleaned_name = _clean_group_name(group_name)
+            code = _clean_invite_code(desired_code or cleaned_name)
+            error = _group_creation_error(cleaned_name, code, state["groups"])
+            if error:
+                st.error(error)
+            else:
+                try:
+                    group = store.create_group(cleaned_name, code, participant)
+                except Exception:
+                    st.error("No se pudo crear el grupo. Prueba con otro codigo.")
+                    return
+                load_state.clear()
+                st.session_state["active_group_id"] = group.group_id
+                st.success("Grupo creado correctamente.")
+                st.rerun()
 
     st.markdown('<div class="section-title">Actualizar PIN</div>', unsafe_allow_html=True)
     with st.form("update_pin"):
@@ -406,39 +473,50 @@ def account_view(participant: str, state: dict[str, Any]) -> None:
     st.success("PIN actualizado correctamente.")
 
 
-def admin_view(state: dict[str, Any]) -> None:
+def admin_view(participant: str, state: dict[str, Any], active_group: Any) -> None:
     store = get_store()
-    pending_users = [user for user in state["users"] if not user.active]
-    active_users = [user for user in state["users"] if user.active]
+    is_global_admin = st.session_state.get("role") == "admin"
+    active_members = _active_members_for_group(active_group.group_id, state)
+    pending_members = _pending_members_for_group(active_group.group_id, state)
 
-    st.subheader("Usuarios pendientes")
-    if not pending_users:
-        st.info("No hay usuarios pendientes de aprobacion.")
-    for user in sorted(pending_users, key=lambda item: item.participant.casefold()):
+    st.subheader(f"Solicitudes pendientes - {active_group.name}")
+    st.caption(f"Miembros activos: {len(active_members)} / 10")
+    if not pending_members:
+        st.info("No hay solicitudes pendientes para este grupo.")
+    for membership in sorted(pending_members, key=lambda item: item.participant.casefold()):
         cols = st.columns([1, 0.28], vertical_alignment="center")
         cols[0].markdown(
             f"""
             <div class="user-approval-row">
-              <strong>{escape(user.participant)}</strong>
-              <span>{escape(user.role or "player")}</span>
+              <strong>{escape(membership.participant)}</strong>
+              <span>{escape(membership.role or "player")}</span>
             </div>
             """,
             unsafe_allow_html=True,
         )
-        if cols[1].button("Aprobar", key=f"approve_{user.participant}", use_container_width=True):
-            store.set_user_active(user.participant, True)
+        disabled = len(active_members) >= 10
+        if cols[1].button("Aprobar", key=f"approve_{active_group.group_id}_{membership.participant}", use_container_width=True, disabled=disabled):
+            if store.active_member_count(active_group.group_id) >= 10:
+                st.error("Este grupo ya alcanzo el maximo de 10 participantes.")
+                return
+            store.set_membership_status(active_group.group_id, membership.participant, "active")
             load_state.clear()
-            st.success(f"Usuario {user.participant} aprobado.")
+            st.success(f"Usuario {membership.participant} aprobado en {active_group.name}.")
             st.rerun()
+        if disabled:
+            cols[1].caption("Grupo lleno")
 
     with st.expander("Usuarios activos"):
-        if not active_users:
+        if not active_members:
             st.caption("No hay usuarios activos.")
-        for user in sorted(active_users, key=lambda item: item.participant.casefold()):
+        for membership in sorted(active_members, key=lambda item: item.participant.casefold()):
             st.markdown(
-                f'<div class="active-user-row"><strong>{escape(user.participant)}</strong><span>{escape(user.role)}</span></div>',
+                f'<div class="active-user-row"><strong>{escape(membership.participant)}</strong><span>{escape(membership.role)}</span></div>',
                 unsafe_allow_html=True,
             )
+
+    if not is_global_admin:
+        return
 
     st.subheader("Cierres manuales")
     teams_by_group = _teams_by_group(state["matches"])
@@ -474,15 +552,15 @@ def admin_view(state: dict[str, Any]) -> None:
 
     st.subheader("Publicar ranking")
     if st.button("Recalcular y guardar ranking"):
-        ranking, detail = _score_state(state)
+        ranking, detail = _score_rows_by_group(state)
         store.replace_rows("Ranking", ranking)
         store.replace_rows("Detail", _fit_detail_rows(detail))
         load_state.clear()
         st.success("Ranking guardado en Supabase.")
 
 
-def _score_state(state: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    return score_all(
+def _score_state(state: dict[str, Any], group_id: str | None = None) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    ranking, detail = score_all(
         state["predictions"],
         state["results"],
         state["final_picks"],
@@ -495,6 +573,14 @@ def _score_state(state: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict
         state["matches"],
         state["points"],
     )
+    if not group_id:
+        return ranking, detail
+    participants = _active_participants_for_group(group_id, state)
+    ranking = [row for row in ranking if row.get("participant") in participants]
+    for idx, row in enumerate(ranking, start=1):
+        row["rank"] = idx
+    detail = [row for row in detail if row.get("participant") in participants]
+    return ranking, detail
 
 
 def _match_prediction_card(
@@ -567,6 +653,128 @@ def _teams_by_group(matches: list[MatchResult]) -> dict[str, list[str]]:
     return {group: sorted(teams) for group, teams in groups.items()}
 
 
+def _active_group_for_session(participant: str, state: dict[str, Any]) -> Any | None:
+    groups = {group.group_id: group for group in state["groups"] if group.active}
+    active_memberships = [
+        membership
+        for membership in state["memberships"]
+        if membership.participant == participant and membership.status == "active" and membership.group_id in groups
+    ]
+    if not active_memberships:
+        st.session_state.pop("active_group_id", None)
+        return None
+    selected = st.session_state.get("active_group_id")
+    if selected in groups and any(membership.group_id == selected for membership in active_memberships):
+        return groups[selected]
+    first_group_id = active_memberships[0].group_id
+    st.session_state["active_group_id"] = first_group_id
+    return groups[first_group_id]
+
+
+def _group_selector(participant: str, state: dict[str, Any], active_group: Any) -> None:
+    groups = {group.group_id: group for group in state["groups"] if group.active}
+    user_group_ids = [
+        membership.group_id
+        for membership in state["memberships"]
+        if membership.participant == participant and membership.status == "active" and membership.group_id in groups
+    ]
+    if len(user_group_ids) <= 1:
+        return
+    options = {groups[group_id].name: group_id for group_id in user_group_ids}
+    selected_name = st.selectbox(
+        "Grupo activo",
+        list(options),
+        index=list(options.values()).index(active_group.group_id),
+        key="active_group_select",
+    )
+    selected_group_id = options[selected_name]
+    if selected_group_id != active_group.group_id:
+        st.session_state["active_group_id"] = selected_group_id
+        st.rerun()
+
+
+def _session_html(participant: str, active_group: Any | None) -> str:
+    group = f' · Grupo: <strong>{escape(active_group.name)}</strong>' if active_group else ""
+    return f'<div class="session-chip">Sesion: <strong>{escape(participant)}</strong>{group}</div>'
+
+
+def _is_group_admin(participant: str, group_id: str, state: dict[str, Any]) -> bool:
+    return any(
+        membership.participant == participant
+        and membership.group_id == group_id
+        and membership.status == "active"
+        and membership.role == "admin"
+        for membership in state["memberships"]
+    )
+
+
+def _membership_for(participant: str, group_id: str, state: dict[str, Any]) -> Any | None:
+    return next(
+        (
+            membership
+            for membership in state["memberships"]
+            if membership.participant == participant and membership.group_id == group_id
+        ),
+        None,
+    )
+
+
+def _active_members_for_group(group_id: str, state: dict[str, Any]) -> list[Any]:
+    return [
+        membership
+        for membership in state["memberships"]
+        if membership.group_id == group_id and membership.status == "active"
+    ]
+
+
+def _pending_members_for_group(group_id: str, state: dict[str, Any]) -> list[Any]:
+    return [
+        membership
+        for membership in state["memberships"]
+        if membership.group_id == group_id and membership.status == "pending"
+    ]
+
+
+def _active_participants_for_group(group_id: str, state: dict[str, Any]) -> set[str]:
+    return {membership.participant for membership in _active_members_for_group(group_id, state)}
+
+
+def _render_user_groups(participant: str, state: dict[str, Any], active_group: Any | None) -> None:
+    groups = {group.group_id: group for group in state["groups"]}
+    memberships = [membership for membership in state["memberships"] if membership.participant == participant]
+    if not memberships:
+        st.caption("Aun no tienes grupos.")
+        return
+    for membership in memberships:
+        group = groups.get(membership.group_id)
+        if not group:
+            continue
+        active_marker = "Activo" if active_group and active_group.group_id == group.group_id else membership.status
+        st.markdown(
+            f"""
+            <div class="active-user-row">
+              <strong>{escape(group.name)}</strong>
+              <span>{escape(active_marker)} · {escape(group.invite_code)}</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
+def _score_rows_by_group(state: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    ranking_rows: list[dict[str, Any]] = []
+    detail_rows: list[dict[str, Any]] = []
+    for group in state["groups"]:
+        if not group.active:
+            continue
+        ranking, detail = _score_state(state, group.group_id)
+        for row in ranking:
+            ranking_rows.append({"group_id": group.group_id, **row})
+        for row in detail:
+            detail_rows.append({"group_id": group.group_id, **row})
+    return ranking_rows, detail_rows
+
+
 def _team_html(team: str) -> str:
     code = TEAM_CODES.get(team)
     safe_team = escape(team)
@@ -577,6 +785,15 @@ def _team_html(team: str) -> str:
 
 def _clean_participant(value: str) -> str:
     return " ".join(value.strip().split())
+
+
+def _clean_group_name(value: str) -> str:
+    return " ".join(value.strip().split())
+
+
+def _clean_invite_code(value: str) -> str:
+    cleaned = "".join(char for char in value.upper().replace(" ", "-") if char.isalnum() or char == "-")
+    return cleaned[:20]
 
 
 def _user_by_participant(users: list[Any], participant: str) -> Any | None:
@@ -595,6 +812,31 @@ def _registration_error(participant: str, pin: str, confirm_pin: str, users: lis
     if pin != confirm_pin:
         return "El PIN y la confirmacion no coinciden."
     return None
+
+
+def _group_creation_error(name: str, invite_code: str, groups: list[Any]) -> str | None:
+    if not name:
+        return "Escribe un nombre de grupo."
+    if len(name) > 50:
+        return "El nombre del grupo debe tener maximo 50 caracteres."
+    if len(invite_code) < 3:
+        return "El codigo debe tener minimo 3 caracteres."
+    if any(group.invite_code.casefold() == invite_code.casefold() for group in groups):
+        return "Ese codigo de grupo ya existe."
+    return None
+
+
+def _username_suggestions(participant: str, users: list[Any]) -> list[str]:
+    existing = {user.participant.casefold() for user in users}
+    base = "".join(char for char in participant if char.isalnum()) or "Jugador"
+    candidates = [
+        f"{base}2",
+        f"{base}2026",
+        f"{base}FC",
+        f"{base}_1",
+        f"{base}Gol",
+    ]
+    return [candidate for candidate in candidates if candidate.casefold() not in existing][:3]
 
 
 def _pin_update_error(participant: str, current_pin: str, new_pin: str, confirm_pin: str, stored_hash: str) -> str | None:
@@ -636,7 +878,7 @@ def _index(options: list[str], value: str | None) -> int:
 
 
 def _fit_detail_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    headers = ["participant", "match_id", "team_a", "team_b", "pred_score", "real_score", "points"]
+    headers = ["group_id", "participant", "match_id", "team_a", "team_b", "pred_score", "real_score", "points"]
     return [{header: row.get(header, "") for header in headers} for row in rows]
 
 
