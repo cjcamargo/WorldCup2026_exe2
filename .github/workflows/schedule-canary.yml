@@ -1,0 +1,16 @@
+name: Schedule Canary
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "7,42 * * * *"
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Print schedule heartbeat
+        run: |
+          echo "Schedule canary fired"
+          date -u
