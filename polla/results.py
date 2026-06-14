@@ -225,8 +225,8 @@ def _parse_score_lines(text: str, source: str, url: str) -> list[MatchResult]:
     results: list[MatchResult] = []
     pattern = re.compile(r"([A-Z][A-Za-z .'\-]+?)\s+(\d{1,2})\s*[-–]\s*(\d{1,2})\s+([A-Z][A-Za-z .'\-]+)")
     for match in pattern.finditer(text):
-        team_a = match.group(1).strip()
-        team_b = match.group(4).strip()
+        team_a = canonical_team_name(match.group(1).strip())
+        team_b = canonical_team_name(match.group(4).strip())
         if len(team_a) > 40 or len(team_b) > 40:
             continue
         results.append(MatchResult(

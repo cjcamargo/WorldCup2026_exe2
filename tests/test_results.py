@@ -3,6 +3,8 @@ from datetime import timedelta
 import polla.results as results_module
 from polla.models import MatchResult
 from polla.results import update_results_from_sources
+from polla.results import _parse_score_lines
+from polla.schedule import norm_text
 from polla.timeutils import now_bogota
 
 
@@ -92,3 +94,13 @@ def test_espn_scoreboard_result_updates_due_match(monkeypatch):
     assert updated[0].match_id == "M008"
     assert updated[0].goals_a_real == 2
     assert updated[0].goals_b_real == 0
+
+
+def test_wikipedia_parser_canonicalizes_turkey_to_turkiye():
+    parsed = _parse_score_lines("Australia 2 - 0 Turkey", "wiki_test", "https://example.test")
+
+    assert len(parsed) == 1
+    assert parsed[0].team_a == "Australia"
+    assert norm_text(parsed[0].team_b) == "turkiye"
+    assert parsed[0].goals_a_real == 2
+    assert parsed[0].goals_b_real == 0
