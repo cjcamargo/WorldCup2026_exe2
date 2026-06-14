@@ -6,8 +6,15 @@ import unicodedata
 import urllib.request
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Iterable
+
+try:
+    from rapidfuzz import fuzz, process
+except ImportError:  # pragma: no cover - fallback for local environments before dependency install
+    fuzz = None
+    process = None
 
 from .models import MatchResult, Prediction
 from .timeutils import BOGOTA, as_bogota, parse_datetime
@@ -15,6 +22,8 @@ from .timeutils import BOGOTA, as_bogota, parse_datetime
 
 WIKIPEDIA_RAW_GROUP_URL = "https://en.wikipedia.org/w/index.php?title=2026_FIFA_World_Cup_Group_{group}&action=raw"
 GROUP_STAGE_EXPECTED_MATCHES = 72
+FUZZY_TEAM_THRESHOLD = 90
+FUZZY_TEAM_GAP = 8
 
 TEAM_ALIASES = {
     "mexico": "Mexico",
@@ -300,13 +309,46 @@ def parse_wikipedia_kickoff(year: int, month: int, day: int, raw_time: str) -> d
 
 def canonical_team_name(value: str) -> str:
     key = norm_text(value)
-    return TEAM_ALIASES.get(key, _title_case_spaces(value))
+    if key in TEAM_ALIASES:
+        return TEAM_ALIASES[key]
+    return _fuzzy_team_name(key) or _title_case_spaces(value)
 
 
 def norm_text(value: str) -> str:
     stripped = unicodedata.normalize("NFKD", value)
     stripped = stripped.encode("ascii", "ignore").decode("ascii")
     return re.sub(r"[^a-z0-9]+", "", stripped.casefold())
+
+
+def _fuzzy_team_name(key: str) -> str | None:
+    if not key:
+        return None
+    choices = _team_choice_map()
+    if key in choices:
+        return choices[key]
+    matches = _fuzzy_matches(key, choices.keys())
+    if not matches:
+        return None
+    best_key, best_score = matches[0]
+    second_score = matches[1][1] if len(matches) > 1 else 0
+    if best_score >= FUZZY_TEAM_THRESHOLD and best_score - second_score >= FUZZY_TEAM_GAP:
+        return choices[best_key]
+    return None
+
+
+def _fuzzy_matches(key: str, choices: Iterable[str]) -> list[tuple[str, float]]:
+    if process and fuzz:
+        return [(match, float(score)) for match, score, _idx in process.extract(key, choices, scorer=fuzz.WRatio, limit=2)]
+    scored = [
+        (choice, SequenceMatcher(None, key, choice).ratio() * 100)
+        for choice in choices
+    ]
+    return sorted(scored, key=lambda item: item[1], reverse=True)[:2]
+
+
+def _team_choice_map() -> dict[str, str]:
+    canonical_names = set(TEAM_ALIASES.values())
+    return {norm_text(name): name for name in canonical_names}
 
 
 def merge_group_stage_schedule(

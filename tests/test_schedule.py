@@ -22,6 +22,15 @@ def test_canonical_team_name_handles_spanish_aliases():
     assert canonical_team_name("REP. del CONGO") == "DR Congo"
 
 
+def test_canonical_team_name_uses_fuzzy_matching_for_minor_variants():
+    assert canonical_team_name("Czech Republc") == "Czech Republic"
+    assert canonical_team_name("Switzerlnd") == "Switzerland"
+
+
+def test_canonical_team_name_keeps_unknown_low_confidence_values():
+    assert canonical_team_name("Atlantis FC") == "Atlantis Fc"
+
+
 def test_parse_wikipedia_group_page_extracts_matches():
     raw_text = """
 ===Mexico vs South Africa===
