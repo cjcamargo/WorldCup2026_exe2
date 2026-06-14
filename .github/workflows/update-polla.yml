@@ -2,6 +2,8 @@ name: Update Polla Backend
 
 on:
   workflow_dispatch:
+  repository_dispatch:
+    types: [update-polla-backend]
   schedule:
     # GitHub scheduled workflows can be delayed or skipped during high-load windows.
     # Run every 5 minutes, offset from minute 0, to maximize retry opportunities.
