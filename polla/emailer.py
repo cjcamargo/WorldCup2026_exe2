@@ -7,6 +7,26 @@ from email.message import EmailMessage
 from .models import AuditChange
 
 
+def build_group_join_request_email(participant: str, group_name: str, invite_code: str, requested_at: str, cfg: dict) -> EmailMessage:
+    msg = EmailMessage()
+    msg["Subject"] = f"Polla Mundialista: solicitud para unirse a {group_name}"
+    msg["From"] = cfg["from"]
+    msg["To"] = _recipients_header(cfg["to"])
+    msg.set_content(
+        "\n".join([
+            "Hay una nueva solicitud para unirse a un grupo.",
+            "",
+            f"Grupo: {group_name}",
+            f"Codigo: {invite_code}",
+            f"Usuario solicitante: {participant}",
+            f"Fecha/hora: {requested_at}",
+            "",
+            "Entra a la pestaña Admin de la app para aprobarlo.",
+        ])
+    )
+    return msg
+
+
 def build_changes_email(changes: list[AuditChange], cfg: dict) -> EmailMessage:
     msg = EmailMessage()
     msg["Subject"] = f"Alerta Polla Mundialista: {len(changes)} cambio(s) detectado(s)"
@@ -60,8 +80,8 @@ def send_messages(messages: list[EmailMessage], cfg: dict, dry_run: bool) -> lis
         return []
     if dry_run or not cfg.get("enabled"):
         return [f"DRY-RUN email: {msg['Subject']} -> {msg['To']}" for msg in messages]
-    user = os.environ.get(cfg["smtp_user_env"])
-    password = os.environ.get(cfg["smtp_password_env"])
+    user = cfg.get("smtp_user") or os.environ.get(cfg["smtp_user_env"])
+    password = cfg.get("smtp_password") or os.environ.get(cfg["smtp_password_env"])
     if not user or not password:
         raise RuntimeError("Faltan variables de entorno SMTP para enviar correos.")
     with smtplib.SMTP(cfg["smtp_host"], int(cfg["smtp_port"])) as smtp:

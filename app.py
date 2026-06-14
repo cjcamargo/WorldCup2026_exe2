@@ -10,6 +10,7 @@ from typing import Any
 import streamlit as st
 
 from polla.config import config_path, load_json
+from polla.emailer import build_group_join_request_email, send_messages
 from polla.models import FinalPicks, GroupPick, MatchResult
 from polla.scoring import score_all
 from polla.store import hash_pin, verify_pin
@@ -35,9 +36,9 @@ TEAM_CODES = {
     "Canada": "ca",
     "Colombia": "co",
     "Croatia": "hr",
-    "Curaçao": "cw",
+    "Cura\u00e7ao": "cw",
     "Czech Republic": "cz",
-    "Côte d'Ivoire": "ci",
+    "C\u00f4te d'Ivoire": "ci",
     "DR Congo": "cd",
     "Ecuador": "ec",
     "Egypt": "eg",
@@ -68,19 +69,11 @@ TEAM_CODES = {
     "Sweden": "se",
     "Switzerland": "ch",
     "Tunisia": "tn",
-    "Türkiye": "tr",
+    "T\u00fcrkiye": "tr",
     "United States": "us",
     "Uruguay": "uy",
     "Uzbekistan": "uz",
 }
-
-TEAM_CODES.update(
-    {
-        "Curaçao": "cw",
-        "Côte d'Ivoire": "ci",
-        "Türkiye": "tr",
-    }
-)
 
 
 @st.cache_resource(ttl=300)
@@ -163,7 +156,7 @@ def main() -> None:
 
 def render_header(participant: str | None = None, active_group: Any | None = None) -> None:
     logo_data = base64.b64encode(LOGO_PATH.read_bytes()).decode("ascii")
-    group_label = f" · {escape(active_group.name)}" if active_group else ""
+    group_label = f" - {escape(active_group.name)}" if active_group else ""
     session = f'<span class="header-session">{escape(participant)}{group_label}</span>' if participant else ""
     st.markdown(
         f"""
@@ -181,59 +174,113 @@ def render_header(participant: str | None = None, active_group: Any | None = Non
         unsafe_allow_html=True,
     )
 
-
 def login() -> None:
     store = get_store()
     state = load_state()
+    st.markdown('<div class="section-title">Elige como quieres entrar</div>', unsafe_allow_html=True)
+    login_tab, create_group_tab, join_group_tab = st.tabs(["Iniciar sesion", "Crear grupo", "Unirme a grupo"])
+
+    with login_tab:
+        st.caption("Para usuarios que ya tienen cuenta y grupo aprobado.")
+        _login_existing_user(state)
+
+    with create_group_tab:
+        st.caption("Para el primero de una polla: crea el grupo y tu usuario admin.")
+        _create_group_first_user(store, state)
+
+    with join_group_tab:
+        st.caption("Para entrar a una polla existente usando el codigo del grupo.")
+        _join_group_new_user(store, state)
+
+
+def _login_existing_user(state: dict[str, Any]) -> None:
     active_users = [user for user in state["users"] if user.active]
     names = [user.participant for user in active_users]
     with st.form("login"):
-        participant = st.selectbox("Usuario", names)
-        pin = st.text_input("PIN", type="password")
-        submitted = st.form_submit_button("Entrar")
-    if submitted:
-        user = next((item for item in active_users if item.participant == participant), None)
-        if not user or not verify_pin(participant, pin, user.pin_hash):
-            st.error("Usuario o PIN invalido.")
-        else:
-            st.session_state["participant"] = user.participant
-            st.session_state["role"] = user.role
-            st.rerun()
+        participant = st.selectbox("Usuario", names, help="Usa esta opcion si ya tienes usuario y PIN.")
+        pin = st.text_input("PIN", type="password", help="Tu PIN personal de acceso.")
+        submitted = st.form_submit_button("Entrar", help="Ingresa si tu usuario ya fue creado y, si aplica, aprobado en un grupo.")
+    if not submitted:
+        return
+    user = next((item for item in active_users if item.participant == participant), None)
+    if not user or not verify_pin(participant, pin, user.pin_hash):
+        st.error("Usuario o PIN invalido.")
+        return
+    st.session_state["participant"] = user.participant
+    st.session_state["role"] = user.role
+    st.rerun()
 
-    st.divider()
-    with st.expander("Registrarme como nuevo usuario"):
-        with st.form("register_user"):
-            new_participant = st.text_input("Nombre corto")
-            new_pin = st.text_input("PIN", type="password", key="register_pin")
-            confirm_pin = st.text_input("Confirmar PIN", type="password", key="register_confirm_pin")
-            invite_code = st.text_input("Codigo de grupo (opcional)").strip().upper()
-            register_submitted = st.form_submit_button("Enviar solicitud")
-        if register_submitted:
-            cleaned_participant = _clean_participant(new_participant)
-            validation_error = _registration_error(cleaned_participant, new_pin, confirm_pin, state["users"])
-            if validation_error:
-                st.error(validation_error)
-                if any(user.participant.casefold() == cleaned_participant.casefold() for user in state["users"]):
-                    st.info("Sugerencias disponibles: " + ", ".join(_username_suggestions(cleaned_participant, state["users"])))
-                return
-            invite_group = None
-            if invite_code:
-                invite_group = store.group_by_invite_code(invite_code)
-                if not invite_group:
-                    st.error("El codigo de grupo no existe.")
-                    return
-            try:
-                store.create_user(cleaned_participant, hash_pin(cleaned_participant, new_pin), role="player", active=True)
-                if invite_group:
-                    store.create_membership(invite_group.group_id, cleaned_participant, role="player", status="pending")
-            except Exception:
-                st.error("No se pudo crear la solicitud. Revisa si el nombre ya existe e intenta de nuevo.")
-                return
-            load_state.clear()
-            if invite_group:
-                st.success("Usuario creado. Tu solicitud de grupo quedo pendiente de aprobacion.")
-            else:
-                st.success("Usuario creado. Entra y crea un grupo o solicita unirte a uno.")
+
+def _create_group_first_user(store: SupabaseStore, state: dict[str, Any]) -> None:
+    with st.form("create_group_first_user"):
+        group_name = st.text_input("Nombre del grupo", help="Este sera el nombre visible de tu polla.")
+        suggested_code = _clean_invite_code(group_name) if group_name else ""
+        invite_code = st.text_input("Codigo de invitacion", value=suggested_code, help="Comparte este codigo para que otros pidan unirse.").strip().upper()
+        participant = st.text_input("Tu usuario", help="Este usuario sera admin del grupo. Debe ser unico en toda la app.")
+        pin = st.text_input("PIN", type="password", help="Minimo 4 caracteres.")
+        confirm_pin = st.text_input("Confirmar PIN", type="password")
+        submitted = st.form_submit_button("Crear grupo y usuario", help="Crea el grupo y deja tu usuario como admin del grupo.")
+    if not submitted:
+        return
+    cleaned_name = _clean_group_name(group_name)
+    code = _clean_invite_code(invite_code or cleaned_name)
+    cleaned_participant = _clean_participant(participant)
+    group_error = _group_creation_error(cleaned_name, code, state["groups"])
+    user_error = _registration_error(cleaned_participant, pin, confirm_pin, state["users"])
+    if group_error:
+        st.error(group_error)
+        return
+    if user_error:
+        st.error(user_error)
+        if any(user.participant.casefold() == cleaned_participant.casefold() for user in state["users"]):
+            st.info("Sugerencias disponibles: " + ", ".join(_username_suggestions(cleaned_participant, state["users"])))
+        return
+    try:
+        store.create_user(cleaned_participant, hash_pin(cleaned_participant, pin), role="player", active=True)
+        group = store.create_group(cleaned_name, code, cleaned_participant)
+    except Exception:
+        st.error("No se pudo crear el grupo. Revisa si el usuario o codigo ya existen.")
+        return
+    load_state.clear()
+    st.session_state["participant"] = cleaned_participant
+    st.session_state["role"] = "player"
+    st.session_state["active_group_id"] = group.group_id
+    st.success(f"Grupo creado. Comparte el codigo {group.invite_code}.")
+    st.rerun()
+
+
+def _join_group_new_user(store: SupabaseStore, state: dict[str, Any]) -> None:
+    with st.form("join_group_new_user"):
+        invite_code = st.text_input("Codigo de grupo", help="Pidele este codigo al admin del grupo.").strip().upper()
+        participant = st.text_input("Nombre corto", help="Debe estar disponible en toda la app.")
+        pin = st.text_input("PIN", type="password", help="Minimo 4 caracteres.")
+        confirm_pin = st.text_input("Confirmar PIN", type="password")
+        submitted = st.form_submit_button("Enviar solicitud", help="Crea tu usuario y envia una solicitud al admin del grupo.")
+    if not submitted:
+        return
+    group = store.group_by_invite_code(invite_code)
+    if not group:
+        st.error("El codigo de grupo no existe.")
+        return
+    cleaned_participant = _clean_participant(participant)
+    validation_error = _registration_error(cleaned_participant, pin, confirm_pin, state["users"])
+    if validation_error:
+        st.error(validation_error)
+        if any(user.participant.casefold() == cleaned_participant.casefold() for user in state["users"]):
+            st.info("Sugerencias disponibles: " + ", ".join(_username_suggestions(cleaned_participant, state["users"])))
+        return
+    try:
+        store.create_user(cleaned_participant, hash_pin(cleaned_participant, pin), role="player", active=True)
+        store.create_membership(group.group_id, cleaned_participant, role="player", status="pending")
+    except Exception:
+        st.error("No se pudo crear la solicitud. Revisa si el usuario ya existe e intenta de nuevo.")
+        return
+    load_state.clear()
+    email_error = _send_join_request_email(cleaned_participant, group)
+    if email_error:
+        st.warning(f"Solicitud creada, pero no se pudo enviar correo: {email_error}")
+    else:
+        st.success("Solicitud enviada. El admin del grupo debe aprobarte.")
 
 def match_predictions_view(participant: str, state: dict[str, Any]) -> None:
     store = get_store()
@@ -272,13 +319,13 @@ def group_picks_view(participant: str, state: dict[str, Any]) -> None:
         current = picks.get((participant, group), GroupPick(participant, group))
         st.subheader(group)
         if closed:
-            st.info("Este grupo está cerrado por admin.")
+            st.info("Este grupo esta cerrado por admin.")
         with st.form(f"group_{group}"):
-            first = st.selectbox("1°", [""] + teams, index=_index([""] + teams, current.first), disabled=closed, key=f"{group}_first")
+            first = st.selectbox("1", [""] + teams, index=_index([""] + teams, current.first), disabled=closed, key=f"{group}_first")
             second_options = [""] + [team for team in teams if team != first]
-            second = st.selectbox("2°", second_options, index=_index(second_options, current.second), disabled=closed, key=f"{group}_second")
+            second = st.selectbox("2", second_options, index=_index(second_options, current.second), disabled=closed, key=f"{group}_second")
             third_options = [""] + [team for team in teams if team not in {first, second}]
-            third = st.selectbox("3°", third_options, index=_index(third_options, current.third), disabled=closed, key=f"{group}_third")
+            third = st.selectbox("3", third_options, index=_index(third_options, current.third), disabled=closed, key=f"{group}_third")
             submitted = st.form_submit_button("Guardar Top 3", disabled=closed)
         if submitted:
             store.save_group_pick(GroupPick(participant, group, first or None, second or None, third or None), now_bogota())
@@ -293,11 +340,11 @@ def final_picks_view(participant: str, state: dict[str, Any]) -> None:
     teams = sorted({match.team_a for match in state["matches"]} | {match.team_b for match in state["matches"]})
     current = next((pick for pick in state["final_picks"] if pick.participant == participant), FinalPicks(participant))
     if closed:
-        st.info("Los picks finales están cerrados por admin.")
+        st.info("Los picks finales estan cerrados por admin.")
     with st.form("final_picks"):
-        champion = st.selectbox("Campeón", [""] + teams, index=_index([""] + teams, current.champion), disabled=closed)
+        champion = st.selectbox("Campeon", [""] + teams, index=_index([""] + teams, current.champion), disabled=closed)
         runner_options = [""] + [team for team in teams if team != champion]
-        runner_up = st.selectbox("Subcampeón", runner_options, index=_index(runner_options, current.runner_up), disabled=closed)
+        runner_up = st.selectbox("Subcampeon", runner_options, index=_index(runner_options, current.runner_up), disabled=closed)
         third_options = [""] + [team for team in teams if team not in {champion, runner_up}]
         third_place = st.selectbox("Tercer puesto", third_options, index=_index(third_options, current.third_place), disabled=closed)
         submitted = st.form_submit_button("Guardar finales", disabled=closed)
@@ -311,7 +358,7 @@ def final_picks_view(participant: str, state: dict[str, Any]) -> None:
 def ranking_view(state: dict[str, Any], group_id: str) -> None:
     ranking, _detail = _score_state(state, group_id)
     if not ranking:
-        st.info("Todavía no hay puntos calculados.")
+        st.info("Todavia no hay puntos calculados.")
         return
     st.markdown('<div class="section-title">Tabla de posiciones</div>', unsafe_allow_html=True)
     for idx, row in enumerate(ranking, start=1):
@@ -343,26 +390,26 @@ def results_view(state: dict[str, Any]) -> None:
         key=lambda item: item.kickoff_at or datetime.max.replace(tzinfo=BOGOTA),
     )
     if not results:
-        st.info("Todavía no hay resultados reales confirmados.")
+        st.info("Todavia no hay resultados reales confirmados.")
         return
 
     st.markdown(f'<div class="section-title">Resultados confirmados <span>{len(results)}</span></div>', unsafe_allow_html=True)
     for result in results:
         score = _score_text(result.goals_a_real, result.goals_b_real)
         kickoff = result.kickoff_at.strftime("%Y-%m-%d %H:%M") if result.kickoff_at else "Horario por definir"
-        source = result.source or "Automático"
+        source = result.source or "Automatico"
         with st.container(border=True):
             st.markdown(
                 f"""
                 <div class="result-row">
                   <div>
-                    <div class="match-id">{result.match_id} · {result.phase or "Sin fase"}</div>
+                    <div class="match-id">{result.match_id} - {result.phase or "Sin fase"}</div>
                     <div class="result-title">
                       <span>{_team_html(result.team_a)}</span>
                       <strong>{score}</strong>
                       <span>{_team_html(result.team_b)}</span>
                     </div>
-                    <div class="match-time">{kickoff} · Fuente: {source}</div>
+                    <div class="match-time">{kickoff} - Fuente: {source}</div>
                   </div>
                   <span class="match-status open">Confirmado</span>
                 </div>
@@ -374,7 +421,7 @@ def results_view(state: dict[str, Any]) -> None:
 def detail_view(state: dict[str, Any], group_id: str) -> None:
     _ranking, detail = _score_state(state, group_id)
     if not detail:
-        st.info("Todavía no hay detalle de puntos.")
+        st.info("Todavia no hay detalle de puntos.")
         return
     participants = sorted({str(row.get("participant", "")) for row in detail if row.get("participant")})
     selected = st.selectbox("Participante", ["Todos"] + participants, key="detail_participant")
@@ -420,8 +467,8 @@ def account_view(participant: str, state: dict[str, Any], active_group: Any | No
     group_cols = st.columns(2)
     with group_cols[0]:
         with st.form("join_group"):
-            invite_code = st.text_input("Codigo de invitacion").strip().upper()
-            join_submitted = st.form_submit_button("Unirme a grupo")
+            invite_code = st.text_input("Codigo de invitacion", help="Codigo compartido por el admin del grupo.").strip().upper()
+            join_submitted = st.form_submit_button("Unirme a grupo", help="Envia una solicitud pendiente de aprobacion.")
         if join_submitted:
             group = store.group_by_invite_code(invite_code)
             if not group:
@@ -431,14 +478,18 @@ def account_view(participant: str, state: dict[str, Any], active_group: Any | No
             else:
                 store.create_membership(group.group_id, participant, role="player", status="pending")
                 load_state.clear()
-                st.success("Solicitud enviada al admin del grupo.")
+                email_error = _send_join_request_email(participant, group)
+                if email_error:
+                    st.warning(f"Solicitud creada, pero no se pudo enviar correo: {email_error}")
+                else:
+                    st.success("Solicitud enviada al admin del grupo.")
                 st.rerun()
 
     with group_cols[1]:
         with st.form("create_group"):
-            group_name = st.text_input("Nombre del grupo")
-            desired_code = st.text_input("Codigo de invitacion").strip().upper()
-            create_submitted = st.form_submit_button("Crear grupo")
+            group_name = st.text_input("Nombre del grupo", help="Nombre visible en rankings y perfil.")
+            desired_code = st.text_input("Codigo de invitacion", help="Codigo que compartiras con amigos para que se unan.").strip().upper()
+            create_submitted = st.form_submit_button("Crear grupo", help="Crea un nuevo grupo y te asigna como admin.")
         if create_submitted:
             cleaned_name = _clean_group_name(group_name)
             code = _clean_invite_code(desired_code or cleaned_name)
@@ -527,7 +578,7 @@ def admin_view(participant: str, state: dict[str, Any], active_group: Any) -> No
             store.save_setting(key, new_value)
             load_state.clear()
             st.rerun()
-    final_closed = st.toggle("Cerrar campeón/subcampeón/tercero", value=bool(state["settings"].get("final_picks_closed", False)))
+    final_closed = st.toggle("Cerrar campeon/subcampeon/tercero", value=bool(state["settings"].get("final_picks_closed", False)))
     if final_closed != bool(state["settings"].get("final_picks_closed", False)):
         store.save_setting("final_picks_closed", final_closed)
         load_state.clear()
@@ -536,9 +587,9 @@ def admin_view(participant: str, state: dict[str, Any], active_group: Any) -> No
     st.subheader("Resultados finales reales")
     teams = sorted({match.team_a for match in state["matches"]} | {match.team_b for match in state["matches"]})
     with st.form("actual_finals"):
-        actual_champion = st.selectbox("Campeón real", [""] + teams, index=_index([""] + teams, state["settings"].get("actual_champion")))
+        actual_champion = st.selectbox("Campeon real", [""] + teams, index=_index([""] + teams, state["settings"].get("actual_champion")))
         runner_options = [""] + [team for team in teams if team != actual_champion]
-        actual_runner_up = st.selectbox("Subcampeón real", runner_options, index=_index(runner_options, state["settings"].get("actual_runner_up")))
+        actual_runner_up = st.selectbox("Subcampeon real", runner_options, index=_index(runner_options, state["settings"].get("actual_runner_up")))
         third_options = [""] + [team for team in teams if team not in {actual_champion, actual_runner_up}]
         actual_third_place = st.selectbox("Tercer puesto real", third_options, index=_index(third_options, state["settings"].get("actual_third_place")))
         submitted = st.form_submit_button("Guardar resultados finales reales")
@@ -694,7 +745,7 @@ def _group_selector(participant: str, state: dict[str, Any], active_group: Any) 
 
 
 def _session_html(participant: str, active_group: Any | None) -> str:
-    group = f' · Grupo: <strong>{escape(active_group.name)}</strong>' if active_group else ""
+    group = f' - Grupo: <strong>{escape(active_group.name)}</strong>' if active_group else ""
     return f'<div class="session-chip">Sesion: <strong>{escape(participant)}</strong>{group}</div>'
 
 
@@ -754,7 +805,7 @@ def _render_user_groups(participant: str, state: dict[str, Any], active_group: A
             f"""
             <div class="active-user-row">
               <strong>{escape(group.name)}</strong>
-              <span>{escape(active_marker)} · {escape(group.invite_code)}</span>
+              <span>{escape(active_marker)} - {escape(membership.role)} - Codigo {escape(group.invite_code)}</span>
             </div>
             """,
             unsafe_allow_html=True,
@@ -837,6 +888,28 @@ def _username_suggestions(participant: str, users: list[Any]) -> list[str]:
         f"{base}Gol",
     ]
     return [candidate for candidate in candidates if candidate.casefold() not in existing][:3]
+
+
+def _send_join_request_email(participant: str, group: Any) -> str | None:
+    try:
+        cfg = load_json(config_path("alertas.json"))
+        smtp_user_env = cfg.get("smtp_user_env")
+        smtp_password_env = cfg.get("smtp_password_env")
+        if smtp_user_env and smtp_user_env in st.secrets:
+            cfg["smtp_user"] = st.secrets[smtp_user_env]
+        if smtp_password_env and smtp_password_env in st.secrets:
+            cfg["smtp_password"] = st.secrets[smtp_password_env]
+        message = build_group_join_request_email(
+            participant=participant,
+            group_name=group.name,
+            invite_code=group.invite_code,
+            requested_at=now_bogota().isoformat(),
+            cfg=cfg,
+        )
+        send_messages([message], cfg, dry_run=bool(cfg.get("dry_run", False)))
+    except Exception as exc:
+        return str(exc)
+    return None
 
 
 def _pin_update_error(participant: str, current_pin: str, new_pin: str, confirm_pin: str, stored_hash: str) -> str | None:

@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
-from app import _group_creation_error, _pin_update_error, _registration_error, _username_suggestions
+from app import _clean_invite_code, _group_creation_error, _pin_update_error, _registration_error, _username_suggestions
+from polla.emailer import build_group_join_request_email
 from polla.store import hash_pin
 
 
@@ -54,3 +55,19 @@ def test_group_creation_rejects_duplicate_code():
     error = _group_creation_error("Exe2 nuevo", "EXE2", groups)
 
     assert error
+
+
+def test_clean_invite_code_from_group_name():
+    assert _clean_invite_code("Polla Familia 2026") == "POLLA-FAMILIA-2026"
+
+
+def test_group_join_request_email_contains_request_details():
+    cfg = {"from": "from@example.com", "to": ["admin@example.com"]}
+
+    msg = build_group_join_request_email("Nuevo", "Exe2", "EXE2", "2026-06-14T10:00:00", cfg)
+
+    body = msg.get_content()
+    assert msg["To"] == "admin@example.com"
+    assert "Nuevo" in body
+    assert "Exe2" in body
+    assert "EXE2" in body
