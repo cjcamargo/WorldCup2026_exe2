@@ -893,12 +893,19 @@ def _username_suggestions(participant: str, users: list[Any]) -> list[str]:
 def _send_join_request_email(participant: str, group: Any) -> str | None:
     try:
         cfg = load_json(config_path("alertas.json"))
-        smtp_user_env = cfg.get("smtp_user_env")
-        smtp_password_env = cfg.get("smtp_password_env")
-        if smtp_user_env and smtp_user_env in st.secrets:
-            cfg["smtp_user"] = st.secrets[smtp_user_env]
-        if smtp_password_env and smtp_password_env in st.secrets:
-            cfg["smtp_password"] = st.secrets[smtp_password_env]
+
+        smtp_user_env = cfg.get("smtp_user_env", "POLLA_SMTP_USER")
+        smtp_password_env = cfg.get("smtp_password_env", "POLLA_SMTP_PASSWORD")
+
+        cfg["smtp_user"] = st.secrets.get(smtp_user_env)
+        cfg["smtp_password"] = st.secrets.get(smtp_password_env)
+
+        if not cfg["smtp_user"]:
+            return f"No se encontró el secret {smtp_user_env} en Streamlit Secrets."
+
+        if not cfg["smtp_password"]:
+            return f"No se encontró el secret {smtp_password_env} en Streamlit Secrets."
+
         message = build_group_join_request_email(
             participant=participant,
             group_name=group.name,
@@ -906,11 +913,13 @@ def _send_join_request_email(participant: str, group: Any) -> str | None:
             requested_at=now_bogota().isoformat(),
             cfg=cfg,
         )
+
         send_messages([message], cfg, dry_run=bool(cfg.get("dry_run", False)))
+
     except Exception as exc:
         return str(exc)
-    return None
 
+    return None
 
 def _pin_update_error(participant: str, current_pin: str, new_pin: str, confirm_pin: str, stored_hash: str) -> str | None:
     if not verify_pin(participant, current_pin, stored_hash):
