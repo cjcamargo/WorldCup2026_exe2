@@ -7,7 +7,6 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
-import pandas as pd
 import streamlit as st
 
 from polla.config import config_path, load_json
@@ -75,6 +74,14 @@ TEAM_CODES = {
     "Uzbekistan": "uz",
 }
 
+TEAM_CODES.update(
+    {
+        "Curaçao": "cw",
+        "Côte d'Ivoire": "ci",
+        "Türkiye": "tr",
+    }
+)
+
 
 @st.cache_resource(ttl=300)
 def get_store() -> SupabaseStore:
@@ -106,16 +113,17 @@ def load_state() -> dict[str, Any]:
 
 def main() -> None:
     inject_styles()
-    render_header()
     if "participant" not in st.session_state:
+        render_header()
         login()
         return
 
     state = load_state()
     participant = st.session_state["participant"]
     role = st.session_state["role"]
-    session_col, exit_col = st.columns([1, 0.18], vertical_alignment="center")
-    session_col.caption(f"Sesión: {participant}")
+    render_header(participant)
+    session_col, exit_col = st.columns([1, 0.16], vertical_alignment="center")
+    session_col.markdown(f'<div class="session-chip">Sesion: <strong>{escape(participant)}</strong></div>', unsafe_allow_html=True)
     if exit_col.button("Salir", type="secondary", use_container_width=True):
         st.session_state.clear()
         st.rerun()
@@ -141,16 +149,20 @@ def main() -> None:
             admin_view(state)
 
 
-def render_header() -> None:
+def render_header(participant: str | None = None) -> None:
     logo_data = base64.b64encode(LOGO_PATH.read_bytes()).decode("ascii")
+    session = f'<span class="header-session">{escape(participant)}</span>' if participant else ""
     st.markdown(
         f"""
-        <section class="app-hero">
-          <div class="hero-logo"><img src="data:image/png;base64,{logo_data}" alt="Exe2 logo" /></div>
-          <div class="hero-copy">
-            <h1>Polla Mundialista Exe2</h1>
-            <p>Pronósticos, ranking y resultados en una sola cancha.</p>
+        <section class="app-shell-header">
+          <div class="brand-lockup">
+            <img src="data:image/png;base64,{logo_data}" alt="Exe2 logo" />
+            <div class="brand-copy">
+              <h1>Polla Mundialista Exe2</h1>
+              <p>Pronosticos, ranking y resultados en una sola cancha.</p>
+            </div>
           </div>
+          {session}
         </section>
         """,
         unsafe_allow_html=True,
@@ -193,9 +205,9 @@ def match_predictions_view(participant: str, state: dict[str, Any]) -> None:
     locked_count = len(state["matches"]) - open_count
 
     metric_cols = st.columns(3)
-    metric_cols[0].metric("Marcadores guardados", saved_count)
-    metric_cols[1].metric("Partidos abiertos", open_count)
-    metric_cols[2].metric("Partidos cerrados", locked_count)
+    _metric_card(metric_cols[0], "Marcadores guardados", saved_count, "score")
+    _metric_card(metric_cols[1], "Partidos abiertos", open_count, "open")
+    _metric_card(metric_cols[2], "Partidos cerrados", locked_count, "closed")
 
     grid = st.columns(2)
     for idx, match in enumerate(selected_matches):
@@ -254,7 +266,28 @@ def ranking_view(state: dict[str, Any]) -> None:
     if not ranking:
         st.info("Todavía no hay puntos calculados.")
         return
-    st.dataframe(pd.DataFrame(ranking), hide_index=True, use_container_width=True)
+    st.markdown('<div class="section-title">Tabla de posiciones</div>', unsafe_allow_html=True)
+    for idx, row in enumerate(ranking, start=1):
+        raw_rank = row.get("rank") or idx
+        try:
+            rank_num = int(raw_rank)
+        except (TypeError, ValueError):
+            rank_num = idx
+        participant = escape(str(row.get("participant", "")))
+        points = escape(str(row.get("points", 0)))
+        medal = {1: "1", 2: "2", 3: "3"}.get(rank_num, str(raw_rank))
+        st.markdown(
+            f"""
+            <div class="ranking-row rank-{rank_num}">
+              <div class="rank-left">
+                <span class="rank-medal">{medal}</span>
+                <span class="rank-name">{participant}</span>
+              </div>
+              <div class="rank-points"><strong>{points}</strong><span>pts</span></div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 
 def results_view(state: dict[str, Any]) -> None:
@@ -266,7 +299,7 @@ def results_view(state: dict[str, Any]) -> None:
         st.info("Todavía no hay resultados reales confirmados.")
         return
 
-    st.caption(f"Resultados confirmados: {len(results)}")
+    st.markdown(f'<div class="section-title">Resultados confirmados <span>{len(results)}</span></div>', unsafe_allow_html=True)
     for result in results:
         score = _score_text(result.goals_a_real, result.goals_b_real)
         kickoff = result.kickoff_at.strftime("%Y-%m-%d %H:%M") if result.kickoff_at else "Horario por definir"
@@ -296,7 +329,35 @@ def detail_view(state: dict[str, Any]) -> None:
     if not detail:
         st.info("Todavía no hay detalle de puntos.")
         return
-    st.dataframe(pd.DataFrame(detail), hide_index=True, use_container_width=True)
+    participants = sorted({str(row.get("participant", "")) for row in detail if row.get("participant")})
+    selected = st.selectbox("Participante", ["Todos"] + participants, key="detail_participant")
+    rows = [row for row in detail if selected == "Todos" or row.get("participant") == selected]
+    st.markdown(f'<div class="section-title">Detalle de puntos <span>{len(rows)}</span></div>', unsafe_allow_html=True)
+    for row in rows:
+        participant = escape(str(row.get("participant", "")))
+        match_id = escape(str(row.get("match_id", "")))
+        team_a = escape(str(row.get("team_a", "")))
+        team_b = escape(str(row.get("team_b", "")))
+        pred_score = escape(str(row.get("pred_score", "- : -")))
+        real_score = escape(str(row.get("real_score", "- : -")))
+        points = escape(str(row.get("points", 0)))
+        st.markdown(
+            f"""
+            <div class="detail-card">
+              <div class="detail-top">
+                <span class="match-id">{match_id}</span>
+                <span class="detail-participant">{participant}</span>
+                <span class="points-pill">+{points} pts</span>
+              </div>
+              <div class="detail-match">{team_a} vs {team_b}</div>
+              <div class="detail-score-grid">
+                <div><span>Prediccion</span><strong>{pred_score}</strong></div>
+                <div><span>Resultado</span><strong>{real_score}</strong></div>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 
 def admin_view(state: dict[str, Any]) -> None:
@@ -371,8 +432,11 @@ def _match_prediction_card(
     with st.container(border=True):
         st.markdown(
             f"""
-            <div class="match-head">
-              <span class="match-id">{match.match_id}</span>
+            <div class="match-card-top">
+              <div>
+                <span class="match-id">{match.match_id}</span>
+                <div class="match-time">{caption}</div>
+              </div>
               <span class="match-status {'locked' if locked else 'open'}">{status}</span>
             </div>
             <div class="match-title">
@@ -380,12 +444,11 @@ def _match_prediction_card(
               <span class="versus">vs</span>
               <span>{_team_html(match.team_b)}</span>
             </div>
-            <div class="match-time">{caption}</div>
             """,
             unsafe_allow_html=True,
         )
         with st.form(f"pred_{match.match_id}"):
-            col_a, col_b, col_save = st.columns([1, 1, 0.9], vertical_alignment="bottom")
+            col_a, score_sep, col_b, col_save = st.columns([0.8, 0.18, 0.8, 0.75], vertical_alignment="bottom")
             goals_a = col_a.number_input(
                 match.team_a,
                 min_value=0,
@@ -394,7 +457,9 @@ def _match_prediction_card(
                 step=1,
                 disabled=locked,
                 key=f"{match.match_id}_a",
+                label_visibility="collapsed",
             )
+            score_sep.markdown('<div class="score-separator">:</div>', unsafe_allow_html=True)
             goals_b = col_b.number_input(
                 match.team_b,
                 min_value=0,
@@ -403,6 +468,7 @@ def _match_prediction_card(
                 step=1,
                 disabled=locked,
                 key=f"{match.match_id}_b",
+                label_visibility="collapsed",
             )
             submitted = col_save.form_submit_button("Guardar", disabled=locked, use_container_width=True)
         if submitted:
@@ -431,6 +497,18 @@ def _team_html(team: str) -> str:
     return f'<span class="team-with-flag"><img src="https://flagcdn.com/{code}.svg" alt="" loading="lazy" />{safe_team}</span>'
 
 
+def _metric_card(container: Any, label: str, value: int, variant: str) -> None:
+    container.markdown(
+        f"""
+        <div class="metric-card metric-{variant}">
+          <span>{escape(label)}</span>
+          <strong>{value}</strong>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def _score_text(goals_a: int | None, goals_b: int | None) -> str:
     if goals_a is None or goals_b is None:
         return "- : -"
@@ -455,134 +533,216 @@ def inject_styles() -> None:
         """
         <style>
         :root {
-            --exe-yellow: #fcd116;
-            --exe-blue: #174ea6;
-            --exe-red: #ce1126;
-            --exe-ink: #10251a;
-            --exe-grass: #0f7a45;
-            --exe-grass-bright: #18a35c;
+            --exe-bg: #ffffff;
             --exe-surface: #ffffff;
-            --exe-border: #d7e0ea;
+            --exe-surface-soft: #f6f8fb;
+            --exe-ink: #071421;
+            --exe-muted: #64748b;
+            --exe-border: #dbe4ee;
+            --exe-blue: #1155d9;
+            --exe-blue-dark: #082142;
+            --exe-cyan: #06b6d4;
+            --exe-green: #39e600;
+            --exe-green-soft: #e8ffe5;
+            --exe-red: #e11d48;
+            --exe-gold: #f5c542;
+            --exe-shadow: 0 12px 30px rgba(8, 33, 66, 0.08);
         }
         .stApp {
-            background: #ffffff;
+            background: var(--exe-bg);
             color: var(--exe-ink);
         }
         .block-container {
-            max-width: 1280px;
-            padding-top: 1.1rem;
+            max-width: 1180px;
+            padding-top: 0.85rem;
             padding-bottom: 3rem;
         }
-        .app-hero {
-            display: grid;
-            grid-template-columns: 136px 1fr;
+        header[data-testid="stHeader"] {
+            background: rgba(255, 255, 255, 0.82);
+            backdrop-filter: blur(10px);
+        }
+        .app-shell-header {
+            display: flex;
             align-items: center;
-            gap: 1.2rem;
-            margin-bottom: 0.7rem;
-            padding: 0.7rem 0.9rem;
-            border-radius: 12px;
-            background: #ffffff;
-            border: 1px solid #e5e7eb;
-            border-left: 8px solid var(--exe-grass);
-            box-shadow: 0 8px 24px rgba(16, 37, 26, 0.08);
-        }
-        .hero-logo {
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 0.55rem;
+            padding: 0.8rem 1rem;
+            border: 1px solid var(--exe-border);
             border-radius: 10px;
+            background: linear-gradient(135deg, #ffffff 0%, #f8fbff 58%, #effff0 100%);
+            box-shadow: var(--exe-shadow);
+        }
+        .brand-lockup {
+            display: flex;
+            align-items: center;
+            gap: 0.95rem;
+            min-width: 0;
+        }
+        .brand-lockup img {
+            width: 82px;
+            height: 82px;
+            object-fit: contain;
+            flex: 0 0 auto;
+            border-radius: 8px;
             background: #ffffff;
-            padding: 0;
-            box-shadow: none;
         }
-        .hero-logo img {
-            display: block;
-            width: 124px;
-            height: auto;
-            border-radius: 10px;
-        }
-        .hero-copy h1 {
+        .brand-copy h1 {
             margin: 0;
             color: var(--exe-ink);
-            font-size: clamp(1.7rem, 3vw, 2.8rem);
-            line-height: 1.04;
+            font-size: clamp(1.45rem, 2.4vw, 2.25rem);
+            line-height: 1.02;
             font-weight: 900;
+            letter-spacing: 0;
         }
-        .hero-copy p {
-            margin: 0.35rem 0 0;
-            color: #38634c;
-            font-size: 0.98rem;
+        .brand-copy p {
+            margin: 0.3rem 0 0;
+            color: #33526f;
+            font-size: 0.96rem;
+            font-weight: 650;
+        }
+        .header-session,
+        .session-chip {
+            display: inline-flex;
+            align-items: center;
+            width: fit-content;
+            gap: 0.35rem;
+            color: #39546d;
+            background: var(--exe-surface-soft);
+            border: 1px solid var(--exe-border);
+            border-radius: 999px;
+            padding: 0.36rem 0.7rem;
+            font-size: 0.82rem;
             font-weight: 650;
         }
         .stTabs [data-baseweb="tab-list"] {
-            gap: 0.35rem;
-            border-bottom: 3px solid var(--exe-yellow);
+            gap: 0.25rem;
+            border-bottom: 1px solid var(--exe-border);
+            padding-bottom: 0;
+            overflow-x: auto;
         }
         .stTabs [data-baseweb="tab"] {
+            min-height: 38px;
+            height: 38px;
             border-radius: 8px 8px 0 0;
-            color: var(--exe-ink);
-            font-weight: 750;
+            color: #31465b;
+            font-size: 0.92rem;
+            font-weight: 800;
+            padding: 0.35rem 0.8rem;
+            border: 1px solid transparent;
+            white-space: nowrap;
         }
         .stTabs [aria-selected="true"] {
-            background: var(--exe-blue);
+            background: var(--exe-blue-dark);
+            border-color: var(--exe-blue-dark);
             color: #ffffff;
+        }
+        .stSelectbox label,
+        .stNumberInput label,
+        .stTextInput label {
+            color: #25384b;
+            font-weight: 750;
+            font-size: 0.88rem;
         }
         .stButton > button,
         .stFormSubmitButton > button {
+            min-height: 38px;
             border-radius: 8px;
-            border: 1px solid #d3ab00;
-            background: var(--exe-yellow);
-            color: var(--exe-ink);
-            font-weight: 800;
+            border: 1px solid #0d3da1;
+            background: linear-gradient(135deg, var(--exe-blue), #0b2f74);
+            color: #ffffff;
+            font-weight: 850;
+            letter-spacing: 0;
+            box-shadow: 0 6px 14px rgba(17, 85, 217, 0.16);
         }
         .stButton > button:hover,
         .stFormSubmitButton > button:hover {
-            border-color: var(--exe-blue);
-            color: var(--exe-blue);
+            border-color: var(--exe-green);
+            color: #ffffff;
+            filter: brightness(1.04);
         }
-        div[data-testid="stMetric"] {
-            background: rgba(255,255,255,0.92);
+        .stButton > button:disabled,
+        .stFormSubmitButton > button:disabled {
+            background: #e8edf3;
+            border-color: #d7e0ea;
+            color: #8795a5;
+            box-shadow: none;
+        }
+        .metric-card {
+            min-height: 96px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 0.35rem;
             border: 1px solid var(--exe-border);
             border-radius: 8px;
-            padding: 0.7rem 0.85rem;
-            box-shadow: 0 8px 20px rgba(7,27,58,0.06);
+            padding: 0.85rem 0.95rem;
+            background: var(--exe-surface);
+            box-shadow: 0 8px 22px rgba(8, 33, 66, 0.06);
         }
+        .metric-card span {
+            color: var(--exe-muted);
+            font-size: 0.83rem;
+            font-weight: 750;
+        }
+        .metric-card strong {
+            color: var(--exe-ink);
+            font-size: 2.05rem;
+            line-height: 1;
+            font-weight: 900;
+        }
+        .metric-open { border-top: 4px solid var(--exe-green); }
+        .metric-closed { border-top: 4px solid var(--exe-red); }
+        .metric-score { border-top: 4px solid var(--exe-blue); }
         div[data-testid="stVerticalBlockBorderWrapper"] {
             border-color: var(--exe-border);
-            box-shadow: 0 10px 22px rgba(7,27,58,0.07);
-            background: rgba(255,255,255,0.96);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.98);
+            box-shadow: 0 8px 20px rgba(8, 33, 66, 0.06);
         }
+        div[data-testid="stVerticalBlockBorderWrapper"] > div {
+            border-radius: 8px;
+        }
+        .match-card-top,
         .match-head {
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start;
             gap: 0.75rem;
-            margin-bottom: 0.4rem;
+            margin-bottom: 0.35rem;
         }
         .match-id {
             color: var(--exe-blue);
-            font-size: 0.78rem;
-            font-weight: 700;
+            font-size: 0.76rem;
+            font-weight: 900;
+            letter-spacing: 0.02em;
         }
         .match-status {
             border-radius: 999px;
             font-size: 0.72rem;
-            font-weight: 700;
-            padding: 0.16rem 0.5rem;
+            font-weight: 850;
+            padding: 0.18rem 0.55rem;
+            white-space: nowrap;
         }
         .match-status.open {
-            background: #dcfce7;
+            background: var(--exe-green-soft);
             color: #166534;
+            border: 1px solid #bdf7bb;
         }
         .match-status.locked {
-            background: #fee2e2;
+            background: #fff1f2;
             color: var(--exe-red);
+            border: 1px solid #fecdd3;
         }
         .match-title {
             display: grid;
             grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
             align-items: center;
-            gap: 0.45rem;
+            gap: 0.55rem;
+            min-height: 38px;
             font-size: 0.98rem;
-            font-weight: 750;
-            line-height: 1.2;
+            font-weight: 850;
+            line-height: 1.15;
         }
         .match-title span {
             min-width: 0;
@@ -598,23 +758,56 @@ def inject_styles() -> None:
             min-width: 0;
         }
         .team-with-flag img {
-            width: 24px;
+            width: 25px;
             height: 18px;
-            border-radius: 2px;
+            border-radius: 3px;
             object-fit: cover;
-            box-shadow: 0 0 0 1px rgba(16,37,26,0.12);
+            box-shadow: 0 0 0 1px rgba(7, 20, 33, 0.14);
             flex: 0 0 auto;
         }
         .versus {
-            color: var(--exe-red);
-            font-size: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            background: var(--exe-blue-dark);
+            border-radius: 999px;
+            font-size: 0.68rem;
             text-transform: uppercase;
             font-weight: 900;
+            width: 30px;
+            height: 22px;
         }
         .match-time {
-            color: #64748b;
-            font-size: 0.8rem;
-            margin: 0.35rem 0 0.55rem;
+            color: var(--exe-muted);
+            font-size: 0.78rem;
+            margin-top: 0.16rem;
+        }
+        .score-separator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 38px;
+            color: var(--exe-blue-dark);
+            font-weight: 900;
+            font-size: 1.25rem;
+        }
+        .section-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 0.35rem 0 0.85rem;
+            color: var(--exe-ink);
+            font-size: 1.05rem;
+            font-weight: 900;
+        }
+        .section-title span {
+            color: var(--exe-blue);
+            background: #eef5ff;
+            border: 1px solid #d9e8ff;
+            border-radius: 999px;
+            padding: 0.14rem 0.5rem;
+            font-size: 0.78rem;
         }
         .result-row {
             display: flex;
@@ -626,52 +819,209 @@ def inject_styles() -> None:
             display: grid;
             grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
             align-items: center;
-            gap: 1rem;
-            margin-top: 0.35rem;
-            font-size: 1.05rem;
-            font-weight: 800;
+            gap: 0.85rem;
+            margin-top: 0.36rem;
+            font-size: 1.02rem;
+            font-weight: 900;
         }
         .result-title strong {
-            color: var(--exe-ink);
-            background: #f8fafc;
-            border: 1px solid #e5e7eb;
+            color: #ffffff;
+            background: var(--exe-blue-dark);
+            border: 1px solid #0f335f;
             border-radius: 8px;
-            padding: 0.25rem 0.65rem;
+            padding: 0.28rem 0.7rem;
             white-space: nowrap;
+            box-shadow: inset 0 -2px 0 rgba(57, 230, 0, 0.25);
         }
         .result-title span:last-child {
             justify-content: flex-end;
             text-align: right;
         }
+        .ranking-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 0.55rem;
+            padding: 0.72rem 0.85rem;
+            border: 1px solid var(--exe-border);
+            border-radius: 8px;
+            background: #ffffff;
+            box-shadow: 0 8px 18px rgba(8, 33, 66, 0.05);
+        }
+        .ranking-row.rank-1 {
+            border-color: rgba(245, 197, 66, 0.75);
+            background: linear-gradient(135deg, #fffaf0 0%, #ffffff 70%);
+        }
+        .ranking-row.rank-2,
+        .ranking-row.rank-3 {
+            background: linear-gradient(135deg, #f8fbff 0%, #ffffff 78%);
+        }
+        .rank-left {
+            display: inline-flex;
+            align-items: center;
+            min-width: 0;
+            gap: 0.7rem;
+        }
+        .rank-medal {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 999px;
+            background: var(--exe-blue-dark);
+            color: #ffffff;
+            font-weight: 900;
+        }
+        .rank-1 .rank-medal { background: var(--exe-gold); color: #241a00; }
+        .rank-name {
+            color: var(--exe-ink);
+            font-weight: 900;
+        }
+        .rank-points {
+            display: inline-flex;
+            align-items: baseline;
+            gap: 0.25rem;
+            color: var(--exe-muted);
+        }
+        .rank-points strong {
+            color: var(--exe-blue-dark);
+            font-size: 1.35rem;
+            font-weight: 950;
+        }
+        .detail-card {
+            margin-bottom: 0.6rem;
+            padding: 0.75rem 0.85rem;
+            border: 1px solid var(--exe-border);
+            border-radius: 8px;
+            background: #ffffff;
+            box-shadow: 0 8px 18px rgba(8, 33, 66, 0.05);
+        }
+        .detail-top {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        .detail-participant {
+            color: var(--exe-muted);
+            font-size: 0.8rem;
+            font-weight: 800;
+        }
+        .points-pill {
+            margin-left: auto;
+            border-radius: 999px;
+            background: var(--exe-green-soft);
+            color: #166534;
+            border: 1px solid #bdf7bb;
+            padding: 0.16rem 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 900;
+        }
+        .detail-match {
+            margin-top: 0.35rem;
+            color: var(--exe-ink);
+            font-weight: 900;
+        }
+        .detail-score-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.55rem;
+            margin-top: 0.55rem;
+        }
+        .detail-score-grid div {
+            border: 1px solid #e7edf4;
+            border-radius: 8px;
+            background: #f8fbff;
+            padding: 0.48rem 0.6rem;
+        }
+        .detail-score-grid span {
+            display: block;
+            color: var(--exe-muted);
+            font-size: 0.72rem;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+        .detail-score-grid strong {
+            display: block;
+            color: var(--exe-blue-dark);
+            font-size: 1.08rem;
+            font-weight: 950;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --exe-bg: #07111e;
+                --exe-surface: #0d1828;
+                --exe-surface-soft: #111f33;
+                --exe-ink: #f7fbff;
+                --exe-muted: #a6b4c4;
+                --exe-border: #203047;
+                --exe-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+            }
+            .stApp { background: var(--exe-bg); }
+            header[data-testid="stHeader"] { background: rgba(7, 17, 30, 0.82); }
+            .app-shell-header,
+            .metric-card,
+            .ranking-row,
+            .detail-card,
+            div[data-testid="stVerticalBlockBorderWrapper"] {
+                background: var(--exe-surface);
+            }
+            .app-shell-header {
+                background: linear-gradient(135deg, #0d1828 0%, #0a1423 60%, #102315 100%);
+            }
+            .brand-lockup img { background: #ffffff; }
+            .brand-copy p,
+            .session-chip,
+            .header-session { color: var(--exe-muted); }
+            .stTabs [data-baseweb="tab"] { color: #d5deea; }
+            .detail-score-grid div { background: #111f33; border-color: #203047; }
+            .result-title strong { border-color: #1d3b63; }
+            .ranking-row.rank-1 { background: linear-gradient(135deg, rgba(245, 197, 66, 0.14), var(--exe-surface) 68%); }
+            .ranking-row.rank-2,
+            .ranking-row.rank-3 { background: linear-gradient(135deg, rgba(17, 85, 217, 0.16), var(--exe-surface) 74%); }
+        }
         @media (max-width: 760px) {
-            .app-hero {
-                grid-template-columns: 1fr;
+            .block-container { padding-top: 0.55rem; }
+            .app-shell-header {
+                align-items: flex-start;
+                flex-direction: column;
                 gap: 0.65rem;
+                padding: 0.75rem;
             }
-            .hero-logo img {
-                width: 104px;
+            .brand-lockup { align-items: center; }
+            .brand-lockup img { width: 62px; height: 62px; }
+            .brand-copy h1 { font-size: 1.35rem; }
+            .brand-copy p { font-size: 0.82rem; }
+            .stTabs [data-baseweb="tab"] {
+                min-height: 36px;
+                height: 36px;
+                padding: 0.3rem 0.62rem;
+                font-size: 0.84rem;
             }
-            .hero-copy h1 {
-                font-size: 1.8rem;
-            }
+            .metric-card { min-height: 82px; padding: 0.68rem; }
+            .metric-card strong { font-size: 1.55rem; }
             .match-title {
                 grid-template-columns: 1fr;
+                gap: 0.35rem;
             }
-            .match-title span:last-child {
-                text-align: left;
-            }
+            .match-title span:last-child { text-align: left; }
+            .versus { width: 28px; height: 20px; }
             .result-row {
                 align-items: flex-start;
                 flex-direction: column;
             }
             .result-title {
                 grid-template-columns: 1fr;
-                gap: 0.4rem;
+                gap: 0.45rem;
             }
             .result-title span:last-child {
                 justify-content: flex-start;
                 text-align: left;
             }
+            .points-pill { margin-left: 0; }
+            .detail-score-grid { grid-template-columns: 1fr; }
         }
         </style>
         """,
