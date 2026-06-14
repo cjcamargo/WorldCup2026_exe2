@@ -146,12 +146,13 @@ def update_results_from_sources(schedule: list[MatchResult], existing: list[Matc
     for match in due:
         source_match = _find_candidate(match, candidates)
         if source_match and source_match.confirmed:
+            goals_a_real, goals_b_real = _goals_in_schedule_order(match, source_match)
             existing_by_id[match.match_id] = MatchResult(
                 match_id=match.match_id,
                 team_a=match.team_a,
                 team_b=match.team_b,
-                goals_a_real=source_match.goals_a_real,
-                goals_b_real=source_match.goals_b_real,
+                goals_a_real=goals_a_real,
+                goals_b_real=goals_b_real,
                 status="final",
                 phase=match.phase,
                 kickoff_at=match.kickoff_at,
@@ -189,6 +190,12 @@ def _find_candidate(match: MatchResult, candidates: list[MatchResult]) -> MatchR
         if {_norm(candidate.team_a), _norm(candidate.team_b)} == {_norm(match.team_a), _norm(match.team_b)}:
             return candidate
     return None
+
+
+def _goals_in_schedule_order(match: MatchResult, candidate: MatchResult) -> tuple[int | None, int | None]:
+    if _norm(candidate.team_a) == _norm(match.team_a):
+        return candidate.goals_a_real, candidate.goals_b_real
+    return candidate.goals_b_real, candidate.goals_a_real
 
 
 def _is_knockout(phase: str | None) -> bool:
