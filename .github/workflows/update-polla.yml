@@ -3,8 +3,9 @@ name: Update Polla Backend
 on:
   workflow_dispatch:
   schedule:
-    # Avoid minute 0/30 because scheduled GitHub Actions can be delayed or dropped during high-load windows.
-    - cron: "7,22,37,52 * * * *"
+    # GitHub scheduled workflows can be delayed or skipped during high-load windows.
+    # Run every 5 minutes, offset from minute 0, to maximize retry opportunities.
+    - cron: "2,7,12,17,22,27,32,37,42,47,52,57 * * * *"
 
 concurrency:
   group: update-polla-backend
