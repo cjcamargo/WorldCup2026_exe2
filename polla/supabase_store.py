@@ -30,6 +30,20 @@ class SupabaseStore:
             for row in rows
         ]
 
+    def create_user(self, participant: str, pin_hash: str, role: str = "player", active: bool = False) -> None:
+        self.client.table("users").insert({
+            "participant": participant,
+            "pin_hash": pin_hash,
+            "role": role,
+            "active": active,
+        }).execute()
+
+    def update_user_pin(self, participant: str, pin_hash: str) -> None:
+        self.client.table("users").update({"pin_hash": pin_hash}).eq("participant", participant).execute()
+
+    def set_user_active(self, participant: str, active: bool) -> None:
+        self.client.table("users").update({"active": active}).eq("participant", participant).execute()
+
     def matches(self) -> list[MatchResult]:
         rows = self._select("matches", order="match_id")
         return [

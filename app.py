@@ -12,7 +12,7 @@ import streamlit as st
 from polla.config import config_path, load_json
 from polla.models import FinalPicks, GroupPick, MatchResult
 from polla.scoring import score_all
-from polla.store import verify_pin
+from polla.store import hash_pin, verify_pin
 from polla.supabase_store import SupabaseStore
 from polla.timeutils import BOGOTA, now_bogota
 
@@ -128,7 +128,7 @@ def main() -> None:
         st.session_state.clear()
         st.rerun()
 
-    tabs = ["Mis marcadores", "Resultados", "Top 3 grupos", "Finales", "Ranking", "Detalle"]
+    tabs = ["Mis marcadores", "Resultados", "Top 3 grupos", "Finales", "Ranking", "Detalle", "Mi cuenta"]
     if role == "admin":
         tabs.append("Admin")
     rendered_tabs = st.tabs(tabs)
@@ -144,8 +144,10 @@ def main() -> None:
         ranking_view(state)
     with rendered_tabs[5]:
         detail_view(state)
+    with rendered_tabs[6]:
+        account_view(participant, state)
     if role == "admin":
-        with rendered_tabs[6]:
+        with rendered_tabs[7]:
             admin_view(state)
 
 
@@ -170,6 +172,7 @@ def render_header(participant: str | None = None) -> None:
 
 
 def login() -> None:
+    store = get_store()
     state = load_state()
     active_users = [user for user in state["users"] if user.active]
     names = [user.participant for user in active_users]
@@ -177,16 +180,35 @@ def login() -> None:
         participant = st.selectbox("Usuario", names)
         pin = st.text_input("PIN", type="password")
         submitted = st.form_submit_button("Entrar")
-    if not submitted:
-        return
-    user = next((item for item in active_users if item.participant == participant), None)
-    if not user or not verify_pin(participant, pin, user.pin_hash):
-        st.error("Usuario o PIN inválido.")
-        return
-    st.session_state["participant"] = user.participant
-    st.session_state["role"] = user.role
-    st.rerun()
+    if submitted:
+        user = next((item for item in active_users if item.participant == participant), None)
+        if not user or not verify_pin(participant, pin, user.pin_hash):
+            st.error("Usuario o PIN invalido.")
+        else:
+            st.session_state["participant"] = user.participant
+            st.session_state["role"] = user.role
+            st.rerun()
 
+    st.divider()
+    with st.expander("Registrarme como nuevo usuario"):
+        with st.form("register_user"):
+            new_participant = st.text_input("Nombre corto")
+            new_pin = st.text_input("PIN", type="password", key="register_pin")
+            confirm_pin = st.text_input("Confirmar PIN", type="password", key="register_confirm_pin")
+            register_submitted = st.form_submit_button("Enviar solicitud")
+        if register_submitted:
+            cleaned_participant = _clean_participant(new_participant)
+            validation_error = _registration_error(cleaned_participant, new_pin, confirm_pin, state["users"])
+            if validation_error:
+                st.error(validation_error)
+                return
+            try:
+                store.create_user(cleaned_participant, hash_pin(cleaned_participant, new_pin), role="player", active=False)
+            except Exception:
+                st.error("No se pudo crear la solicitud. Revisa si el nombre ya existe e intenta de nuevo.")
+                return
+            load_state.clear()
+            st.success("Solicitud enviada. Un admin debe aprobar tu usuario antes de entrar.")
 
 def match_predictions_view(participant: str, state: dict[str, Any]) -> None:
     store = get_store()
@@ -360,8 +382,64 @@ def detail_view(state: dict[str, Any]) -> None:
         )
 
 
+def account_view(participant: str, state: dict[str, Any]) -> None:
+    store = get_store()
+    user = _user_by_participant(state["users"], participant)
+    if not user:
+        st.error("No se encontro el usuario de la sesion.")
+        return
+
+    st.markdown('<div class="section-title">Actualizar PIN</div>', unsafe_allow_html=True)
+    with st.form("update_pin"):
+        current_pin = st.text_input("PIN actual", type="password")
+        new_pin = st.text_input("Nuevo PIN", type="password")
+        confirm_pin = st.text_input("Confirmar nuevo PIN", type="password")
+        submitted = st.form_submit_button("Actualizar PIN")
+    if not submitted:
+        return
+    validation_error = _pin_update_error(participant, current_pin, new_pin, confirm_pin, user.pin_hash)
+    if validation_error:
+        st.error(validation_error)
+        return
+    store.update_user_pin(participant, hash_pin(participant, new_pin))
+    load_state.clear()
+    st.success("PIN actualizado correctamente.")
+
+
 def admin_view(state: dict[str, Any]) -> None:
     store = get_store()
+    pending_users = [user for user in state["users"] if not user.active]
+    active_users = [user for user in state["users"] if user.active]
+
+    st.subheader("Usuarios pendientes")
+    if not pending_users:
+        st.info("No hay usuarios pendientes de aprobacion.")
+    for user in sorted(pending_users, key=lambda item: item.participant.casefold()):
+        cols = st.columns([1, 0.28], vertical_alignment="center")
+        cols[0].markdown(
+            f"""
+            <div class="user-approval-row">
+              <strong>{escape(user.participant)}</strong>
+              <span>{escape(user.role or "player")}</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        if cols[1].button("Aprobar", key=f"approve_{user.participant}", use_container_width=True):
+            store.set_user_active(user.participant, True)
+            load_state.clear()
+            st.success(f"Usuario {user.participant} aprobado.")
+            st.rerun()
+
+    with st.expander("Usuarios activos"):
+        if not active_users:
+            st.caption("No hay usuarios activos.")
+        for user in sorted(active_users, key=lambda item: item.participant.casefold()):
+            st.markdown(
+                f'<div class="active-user-row"><strong>{escape(user.participant)}</strong><span>{escape(user.role)}</span></div>',
+                unsafe_allow_html=True,
+            )
+
     st.subheader("Cierres manuales")
     teams_by_group = _teams_by_group(state["matches"])
     for group in sorted(teams_by_group):
@@ -495,6 +573,40 @@ def _team_html(team: str) -> str:
     if not code:
         return safe_team
     return f'<span class="team-with-flag"><img src="https://flagcdn.com/{code}.svg" alt="" loading="lazy" />{safe_team}</span>'
+
+
+def _clean_participant(value: str) -> str:
+    return " ".join(value.strip().split())
+
+
+def _user_by_participant(users: list[Any], participant: str) -> Any | None:
+    return next((user for user in users if user.participant == participant), None)
+
+
+def _registration_error(participant: str, pin: str, confirm_pin: str, users: list[Any]) -> str | None:
+    if not participant:
+        return "Escribe un nombre corto."
+    if len(participant) > 40:
+        return "El nombre corto debe tener maximo 40 caracteres."
+    if any(user.participant.casefold() == participant.casefold() for user in users):
+        return "Ese nombre ya existe o esta pendiente de aprobacion."
+    if len(pin) < 4:
+        return "El PIN debe tener minimo 4 caracteres."
+    if pin != confirm_pin:
+        return "El PIN y la confirmacion no coinciden."
+    return None
+
+
+def _pin_update_error(participant: str, current_pin: str, new_pin: str, confirm_pin: str, stored_hash: str) -> str | None:
+    if not verify_pin(participant, current_pin, stored_hash):
+        return "El PIN actual no es correcto."
+    if len(new_pin) < 4:
+        return "El nuevo PIN debe tener minimo 4 caracteres."
+    if new_pin != confirm_pin:
+        return "El nuevo PIN y la confirmacion no coinciden."
+    if verify_pin(participant, new_pin, stored_hash):
+        return "El nuevo PIN debe ser diferente al actual."
+    return None
 
 
 def _metric_card(container: Any, label: str, value: int, variant: str) -> None:
@@ -949,6 +1061,31 @@ def inject_styles() -> None:
             font-size: 1.08rem;
             font-weight: 950;
         }
+        .user-approval-row,
+        .active-user-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            min-height: 42px;
+            margin-bottom: 0.45rem;
+            padding: 0.58rem 0.72rem;
+            border: 1px solid var(--exe-border);
+            border-radius: 8px;
+            background: #ffffff;
+        }
+        .user-approval-row strong,
+        .active-user-row strong {
+            color: var(--exe-ink);
+            font-weight: 900;
+        }
+        .user-approval-row span,
+        .active-user-row span {
+            color: var(--exe-muted);
+            font-size: 0.78rem;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
         @media (prefers-color-scheme: dark) {
             :root {
                 --exe-bg: #07111e;
@@ -965,6 +1102,8 @@ def inject_styles() -> None:
             .metric-card,
             .ranking-row,
             .detail-card,
+            .user-approval-row,
+            .active-user-row,
             div[data-testid="stVerticalBlockBorderWrapper"] {
                 background: var(--exe-surface);
             }

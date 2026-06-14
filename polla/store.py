@@ -83,6 +83,18 @@ class GoogleSheetsStore:
             if row.get("participant")
         ]
 
+    def create_user(self, participant: str, pin_hash: str, role: str = "player", active: bool = False) -> None:
+        self.spreadsheet.worksheet("Users").append_row(
+            [participant, pin_hash, role, _encode(active)],
+            value_input_option="USER_ENTERED",
+        )
+
+    def update_user_pin(self, participant: str, pin_hash: str) -> None:
+        self._update_user_fields(participant, {"pin_hash": pin_hash})
+
+    def set_user_active(self, participant: str, active: bool) -> None:
+        self._update_user_fields(participant, {"active": active})
+
     def matches(self) -> list[MatchResult]:
         out: list[MatchResult] = []
         for row in self._rows("Matches"):
@@ -255,6 +267,18 @@ class GoogleSheetsStore:
 
     def _rows(self, sheet_name: str) -> list[dict[str, str]]:
         return self.spreadsheet.worksheet(sheet_name).get_all_records()
+
+    def _update_user_fields(self, participant: str, values: dict[str, Any]) -> None:
+        ws = self.spreadsheet.worksheet("Users")
+        rows = ws.get_all_records()
+        headers = HEADERS["Users"]
+        for idx, row in enumerate(rows, start=2):
+            if row.get("participant") != participant:
+                continue
+            updated = {**row, **values}
+            ws.update(f"A{idx}", [[_encode(updated.get(header)) for header in headers]])
+            return
+        raise ValueError(f"Usuario no encontrado: {participant}")
 
     def _upsert(
         self,
