@@ -1,7 +1,7 @@
 {
   "timezone": "America/Bogota",
   "schedule_cache_hours": 24,
-  "result_first_check_minutes_after_expected_end": 15,
+  "result_first_check_minutes_after_expected_end": 5,
   "result_retry_minutes": 10,
   "result_timeout_hours_after_kickoff": 24,
   "group_stage_expected_minutes": 120,
