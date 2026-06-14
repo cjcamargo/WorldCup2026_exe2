@@ -6,8 +6,8 @@ on:
     types: [update-polla-backend]
   schedule:
     # GitHub scheduled workflows can be delayed or skipped during high-load windows.
-    # Use the standard every-5-minutes cron form for maximum scheduler compatibility.
-    - cron: "*/5 * * * *"
+    # Approximate a 35-minute cadence while avoiding minute 0 high-load windows.
+    - cron: "7,42 * * * *"
 
 concurrency:
   group: update-polla-backend
