@@ -8,6 +8,12 @@
   "knockout_expected_minutes": 180,
   "sources": [
     {
+      "name": "espn_world_cup_scoreboard",
+      "type": "espn_scoreboard",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard",
+      "enabled": true
+    },
+    {
       "name": "wikipedia_2026_world_cup",
       "type": "wikipedia_tables",
       "url": "https://en.wikipedia.org/wiki/2026_FIFA_World_Cup",

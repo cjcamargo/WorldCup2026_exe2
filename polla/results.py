@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import html as html_lib
+import json
 import re
 import urllib.request
 from dataclasses import asdict
@@ -126,6 +127,20 @@ def fetch_sbnation_schedule_results(source_cfg: dict) -> list[MatchResult]:
     return found
 
 
+def fetch_espn_scoreboard_results(source_cfg: dict, due_matches: list[MatchResult]) -> list[MatchResult]:
+    url = source_cfg["url"]
+    found: list[MatchResult] = []
+    for date_key in _espn_date_keys(due_matches):
+        req = urllib.request.Request(f"{url}?dates={date_key}", headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=45) as response:
+            payload = json.load(response)
+        for event in payload.get("events", []):
+            result = _parse_espn_event(event, source_cfg["name"], f"{url}?dates={date_key}")
+            if result:
+                found.append(result)
+    return found
+
+
 def update_results_from_sources(schedule: list[MatchResult], existing: list[MatchResult], cfg: dict) -> tuple[list[MatchResult], list[str]]:
     existing_by_id = {r.match_id: r for r in existing}
     warnings: list[str] = []
@@ -137,7 +152,9 @@ def update_results_from_sources(schedule: list[MatchResult], existing: list[Matc
         if not source.get("enabled", True):
             continue
         try:
-            if source["type"] == "wikipedia_tables":
+            if source["type"] == "espn_scoreboard":
+                candidates.extend(fetch_espn_scoreboard_results(source, due))
+            elif source["type"] == "wikipedia_tables":
                 candidates.extend(fetch_wikipedia_results(source))
             elif source["type"] == "sbnation_schedule":
                 candidates.extend(fetch_sbnation_schedule_results(source))
@@ -161,6 +178,47 @@ def update_results_from_sources(schedule: list[MatchResult], existing: list[Matc
                 confirmed=True,
             )
     return list(existing_by_id.values()), warnings
+
+
+def _espn_date_keys(matches: list[MatchResult]) -> list[str]:
+    dates = set()
+    for match in matches:
+        if not match.kickoff_at:
+            continue
+        dates.add(match.kickoff_at.strftime("%Y%m%d"))
+        dates.add((match.kickoff_at + timedelta(days=1)).strftime("%Y%m%d"))
+    dates.add(now_bogota().strftime("%Y%m%d"))
+    return sorted(dates)
+
+
+def _parse_espn_event(event: dict, source: str, url: str) -> MatchResult | None:
+    competitions = event.get("competitions") or []
+    if not competitions:
+        return None
+    competition = competitions[0]
+    status = competition.get("status", {}).get("type", {})
+    if not status.get("completed"):
+        return None
+    competitors = competition.get("competitors") or []
+    home = next((item for item in competitors if item.get("homeAway") == "home"), None)
+    away = next((item for item in competitors if item.get("homeAway") == "away"), None)
+    if not home or not away:
+        return None
+    team_a = canonical_team_name(home.get("team", {}).get("displayName", ""))
+    team_b = canonical_team_name(away.get("team", {}).get("displayName", ""))
+    if not team_a or not team_b:
+        return None
+    return MatchResult(
+        match_id=f"{_slug(team_a)}_vs_{_slug(team_b)}",
+        team_a=team_a,
+        team_b=team_b,
+        goals_a_real=_to_int(home.get("score")),
+        goals_b_real=_to_int(away.get("score")),
+        status="final",
+        source=source,
+        source_url=url,
+        confirmed=True,
+    )
 
 
 def _parse_score_lines(text: str, source: str, url: str) -> list[MatchResult]:

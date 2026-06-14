@@ -49,3 +49,46 @@ def test_reversed_source_candidate_scores_are_saved_in_schedule_order(monkeypatc
     assert updated[0].team_b == "Scotland"
     assert updated[0].goals_a_real == 1
     assert updated[0].goals_b_real == 2
+
+
+def test_espn_scoreboard_result_updates_due_match(monkeypatch):
+    kickoff = now_bogota() - timedelta(hours=3)
+    schedule = [
+        MatchResult(
+            match_id="M008",
+            team_a="Australia",
+            team_b="Türkiye",
+            phase="Group D",
+            kickoff_at=kickoff,
+        )
+    ]
+    cfg = {
+        "group_stage_expected_minutes": 120,
+        "knockout_expected_minutes": 180,
+        "result_first_check_minutes_after_expected_end": 5,
+        "result_timeout_hours_after_kickoff": 24,
+        "sources": [{"name": "espn_test", "type": "espn_scoreboard", "url": "https://example.test"}],
+    }
+
+    def fake_fetch(_source_cfg, _due):
+        return [
+            MatchResult(
+                match_id="australia_vs_turkiye",
+                team_a="Australia",
+                team_b="Türkiye",
+                goals_a_real=2,
+                goals_b_real=0,
+                source="espn_test",
+                confirmed=True,
+            )
+        ]
+
+    monkeypatch.setattr(results_module, "fetch_espn_scoreboard_results", fake_fetch)
+
+    updated, warnings = update_results_from_sources(schedule, [], cfg)
+
+    assert warnings == []
+    assert len(updated) == 1
+    assert updated[0].match_id == "M008"
+    assert updated[0].goals_a_real == 2
+    assert updated[0].goals_b_real == 0
