@@ -1439,11 +1439,47 @@ def inject_styles() -> None:
             .session-chip,
             .header-session { color: var(--exe-muted); }
             .stTabs [data-baseweb="tab"] { color: #d5deea; }
+            .stSelectbox label,
+            .stNumberInput label,
+            .stTextInput label {
+                color: #dbe7f5;
+            }
+            .stNumberInput input,
+            .stTextInput input,
+            .stSelectbox [data-baseweb="select"] {
+                background: #111f33;
+                border-color: #2a3b55;
+                color: #f7fbff;
+            }
+            .stNumberInput input,
+            .stTextInput input {
+                -webkit-text-fill-color: #f7fbff;
+            }
             .detail-score-grid div { background: #111f33; border-color: #203047; }
             .result-title strong { border-color: #1d3b63; }
             .ranking-row.rank-1 { background: linear-gradient(135deg, rgba(245, 197, 66, 0.14), var(--exe-surface) 68%); }
             .ranking-row.rank-2,
             .ranking-row.rank-3 { background: linear-gradient(135deg, rgba(17, 85, 217, 0.16), var(--exe-surface) 74%); }
+            .rank-points strong,
+            .detail-score-grid strong,
+            .score-separator {
+                color: #f7fbff;
+            }
+            .rank-points span,
+            .metric-card span,
+            .detail-score-grid span {
+                color: #a6b4c4;
+            }
+            .match-status.locked {
+                background: rgba(225, 29, 72, 0.16);
+                color: #fecdd3;
+                border-color: rgba(254, 205, 211, 0.32);
+            }
+            .match-status.open {
+                background: rgba(57, 230, 0, 0.12);
+                color: #bbf7d0;
+                border-color: rgba(187, 247, 208, 0.28);
+            }
         }
         @media (max-width: 760px) {
             .block-container { padding-top: 0.55rem; }
