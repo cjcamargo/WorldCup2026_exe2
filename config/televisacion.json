@@ -1,89 +1,380 @@
 {
   "source": {
-    "name": "Calendario Copa Mundial de la FIFA 2026 - Jorge Barajas",
+    "name": "Calendario Mundial 2026 - canales por partido",
     "url": "https://www.jorgebarajas.com/wp-content/uploads/2026/04/Calendario-Copa-Mundial-de-la-FIFA-2026-Tabloide-4.pdf",
+    "validated_with": "1-calendario_mundial_2026_canales.xlsx",
     "retrieved_at": "2026-06-14"
   },
   "channels": [
-    "Caracol Television",
-    "RCN Television",
-    "D Sports",
+    "Caracol TV",
+    "RCN Televisión",
+    "DSports",
     "Win+",
     "Paramount+",
     "Disney+"
   ],
   "matches": {
-    "M001": ["Caracol Television", "RCN Television", "D Sports", "Paramount+", "Disney+"],
-    "M002": ["D Sports", "Win+", "Paramount+"],
-    "M003": ["D Sports", "Win+", "Paramount+", "Disney+"],
-    "M004": ["Caracol Television", "RCN Television", "D Sports", "Paramount+", "Disney+"],
-    "M005": ["D Sports", "Win+", "Paramount+"],
-    "M006": ["Caracol Television", "RCN Television", "D Sports", "Paramount+", "Disney+"],
-    "M007": ["D Sports", "Paramount+"],
-    "M008": ["D Sports", "Paramount+"],
-    "M009": ["D Sports", "Paramount+"],
-    "M010": ["Caracol Television", "RCN Television", "D Sports", "Paramount+", "Disney+"],
-    "M011": ["D Sports", "Win+", "Paramount+", "Disney+"],
-    "M012": ["D Sports", "Paramount+"],
-    "M013": ["Caracol Television", "RCN Television", "D Sports", "Paramount+", "Disney+"],
-    "M014": ["D Sports", "Paramount+"],
-    "M015": ["D Sports", "Win+", "Paramount+", "Disney+"],
-    "M016": ["D Sports", "Paramount+"],
-    "M017": ["D Sports", "Paramount+"],
-    "M018": ["D Sports", "Win+", "Paramount+"],
-    "M019": ["Caracol Television", "RCN Television", "D Sports", "Paramount+", "Disney+"],
-    "M020": ["D Sports", "Paramount+"],
-    "M021": ["D Sports", "Paramount+"],
-    "M022": ["D Sports", "Win+", "Paramount+"],
-    "M023": ["D Sports", "Paramount+"],
-    "M024": ["Caracol Television", "RCN Television", "D Sports", "Paramount+", "Disney+"],
-    "M025": ["D Sports", "Paramount+"],
-    "M026": ["Caracol Television", "RCN Television", "D Sports", "Paramount+", "Disney+"],
-    "M027": ["D Sports", "Paramount+"],
-    "M028": ["D Sports", "Win+", "Paramount+"],
-    "M029": ["D Sports", "Paramount+"],
-    "M030": ["D Sports", "Win+", "Paramount+", "Disney+"],
-    "M031": ["D Sports", "Paramount+"],
-    "M032": ["D Sports", "Win+", "Paramount+"],
-    "M033": ["D Sports", "Win+", "Paramount+"],
-    "M034": ["Caracol Television", "RCN Television", "D Sports", "Paramount+", "Disney+"],
-    "M035": ["D Sports", "Win+", "Paramount+", "Disney+"],
-    "M036": ["D Sports", "Paramount+"],
-    "M037": ["D Sports", "Win+", "Paramount+", "Disney+"],
-    "M038": ["Caracol Television", "RCN Television", "D Sports", "Paramount+", "Disney+"],
-    "M039": ["D Sports", "Paramount+"],
-    "M040": ["D Sports", "Paramount+"],
-    "M041": ["Caracol Television", "RCN Television", "D Sports", "Paramount+", "Disney+"],
-    "M042": ["D Sports", "Paramount+"],
-    "M043": ["D Sports", "Win+", "Paramount+"],
-    "M044": ["D Sports", "Paramount+"],
-    "M045": ["D Sports", "Win+", "Paramount+"],
-    "M046": ["D Sports", "Paramount+"],
-    "M047": ["D Sports", "Paramount+"],
-    "M048": ["Caracol Television", "RCN Television", "D Sports", "Paramount+", "Disney+"],
-    "M049": ["D Sports", "Paramount+"],
-    "M050": ["D Sports", "Paramount+"],
-    "M051": ["Caracol Television", "RCN Television", "D Sports", "Paramount+", "Disney+"],
-    "M052": ["D Sports", "Paramount+"],
-    "M053": ["D Sports", "Win+", "Paramount+"],
-    "M054": ["D Sports", "Paramount+"],
-    "M055": ["Caracol Television", "RCN Television", "D Sports", "Paramount+", "Disney+"],
-    "M056": ["D Sports", "Paramount+"],
-    "M057": ["D Sports", "Win+", "Paramount+"],
-    "M058": ["D Sports", "Paramount+"],
-    "M059": ["D Sports", "Paramount+"],
-    "M060": ["D Sports", "Paramount+"],
-    "M061": ["D Sports", "Win+", "Paramount+"],
-    "M062": ["D Sports", "Paramount+"],
-    "M063": ["Caracol Television", "RCN Television", "D Sports", "Paramount+", "Disney+"],
-    "M064": ["D Sports", "Paramount+"],
-    "M065": ["D Sports", "Paramount+"],
-    "M066": ["D Sports", "Paramount+"],
-    "M067": ["D Sports", "Paramount+"],
-    "M068": ["D Sports", "Paramount+"],
-    "M069": ["Caracol Television", "RCN Television", "D Sports", "Paramount+", "Disney+"],
-    "M070": ["D Sports", "Paramount+"],
-    "M071": ["D Sports", "Win+", "Paramount+", "Disney+"],
-    "M072": ["D Sports", "Paramount+"]
+    "M001": [
+      "Caracol TV",
+      "RCN Televisión",
+      "DSports",
+      "Paramount+",
+      "Disney+"
+    ],
+    "M002": [
+      "DSports",
+      "Win+",
+      "Paramount+"
+    ],
+    "M003": [
+      "DSports",
+      "Win+",
+      "Paramount+",
+      "Disney+"
+    ],
+    "M004": [
+      "Caracol TV",
+      "RCN Televisión",
+      "DSports",
+      "Paramount+",
+      "Disney+"
+    ],
+    "M005": [
+      "DSports",
+      "Win+",
+      "Paramount+"
+    ],
+    "M006": [
+      "Caracol TV",
+      "RCN Televisión",
+      "DSports",
+      "Paramount+",
+      "Disney+"
+    ],
+    "M007": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M008": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M009": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M010": [
+      "Caracol TV",
+      "RCN Televisión",
+      "DSports",
+      "Paramount+",
+      "Disney+"
+    ],
+    "M011": [
+      "DSports",
+      "Win+",
+      "Paramount+",
+      "Disney+"
+    ],
+    "M012": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M013": [
+      "Caracol TV",
+      "RCN Televisión",
+      "DSports",
+      "Paramount+",
+      "Disney+"
+    ],
+    "M014": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M015": [
+      "DSports",
+      "Win+",
+      "Paramount+",
+      "Disney+"
+    ],
+    "M016": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M017": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M018": [
+      "DSports",
+      "Win+",
+      "Paramount+"
+    ],
+    "M019": [
+      "Caracol TV",
+      "RCN Televisión",
+      "DSports",
+      "Paramount+",
+      "Disney+"
+    ],
+    "M020": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M021": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M022": [
+      "DSports",
+      "Win+",
+      "Paramount+"
+    ],
+    "M023": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M024": [
+      "Caracol TV",
+      "RCN Televisión",
+      "DSports",
+      "Paramount+",
+      "Disney+"
+    ],
+    "M025": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M026": [
+      "Caracol TV",
+      "RCN Televisión",
+      "DSports",
+      "Paramount+",
+      "Disney+"
+    ],
+    "M027": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M028": [
+      "DSports",
+      "Win+",
+      "Paramount+"
+    ],
+    "M029": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M030": [
+      "Caracol TV",
+      "RCN Televisión",
+      "DSports",
+      "Paramount+"
+    ],
+    "M031": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M032": [
+      "DSports",
+      "Win+",
+      "Paramount+"
+    ],
+    "M033": [
+      "DSports",
+      "Win+",
+      "Paramount+"
+    ],
+    "M034": [
+      "Caracol TV",
+      "RCN Televisión",
+      "DSports",
+      "Paramount+",
+      "Disney+"
+    ],
+    "M035": [
+      "DSports",
+      "Win+",
+      "Paramount+",
+      "Disney+"
+    ],
+    "M036": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M037": [
+      "DSports",
+      "Win+",
+      "Paramount+",
+      "Disney+"
+    ],
+    "M038": [
+      "Caracol TV",
+      "RCN Televisión",
+      "DSports",
+      "Paramount+",
+      "Disney+"
+    ],
+    "M039": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M040": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M041": [
+      "Caracol TV",
+      "RCN Televisión",
+      "DSports",
+      "Paramount+",
+      "Disney+"
+    ],
+    "M042": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M043": [
+      "DSports",
+      "Win+",
+      "Paramount+"
+    ],
+    "M044": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M045": [
+      "DSports",
+      "Win+",
+      "Paramount+"
+    ],
+    "M046": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M047": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M048": [
+      "Caracol TV",
+      "RCN Televisión",
+      "DSports",
+      "Paramount+",
+      "Disney+"
+    ],
+    "M049": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M050": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M051": [
+      "Caracol TV",
+      "RCN Televisión",
+      "DSports",
+      "Paramount+",
+      "Disney+"
+    ],
+    "M052": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M053": [
+      "DSports",
+      "Win+",
+      "Paramount+"
+    ],
+    "M054": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M055": [
+      "Caracol TV",
+      "RCN Televisión",
+      "DSports",
+      "Paramount+",
+      "Disney+"
+    ],
+    "M056": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M057": [
+      "DSports",
+      "Win+",
+      "Paramount+"
+    ],
+    "M058": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M059": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M060": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M061": [
+      "DSports",
+      "Win+",
+      "Paramount+"
+    ],
+    "M062": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M063": [
+      "Caracol TV",
+      "RCN Televisión",
+      "DSports",
+      "Paramount+",
+      "Disney+"
+    ],
+    "M064": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M065": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M066": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M067": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M068": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M069": [
+      "Caracol TV",
+      "RCN Televisión",
+      "DSports",
+      "Paramount+",
+      "Disney+"
+    ],
+    "M070": [
+      "DSports",
+      "Paramount+"
+    ],
+    "M071": [
+      "DSports",
+      "Win+",
+      "Paramount+",
+      "Disney+"
+    ],
+    "M072": [
+      "DSports",
+      "Paramount+"
+    ]
   }
 }
