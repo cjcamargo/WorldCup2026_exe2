@@ -13,6 +13,7 @@ from polla.config import config_path, load_json
 from polla.emailer import build_group_join_request_email, send_messages
 from polla.models import FinalPicks, GroupPick, MatchResult
 from polla.scoring import score_all
+from polla.standings import calculate_group_standings
 from polla.store import hash_pin, verify_pin
 from polla.supabase_store import SupabaseStore
 from polla.timeutils import BOGOTA, now_bogota
@@ -132,7 +133,7 @@ def main() -> None:
 
     _group_selector(participant, state, active_group)
 
-    tabs = ["Mis marcadores", "Resultados", "Top 3 grupos", "Finales", "Ranking", "Detalle", "Mi cuenta"]
+    tabs = ["Mis marcadores", "Resultados", "Posiciones", "Top 3 grupos", "Finales", "Ranking", "Detalle", "Mi cuenta"]
     if role == "admin" or _is_group_admin(participant, active_group.group_id, state):
         tabs.append("Admin")
     rendered_tabs = st.tabs(tabs)
@@ -141,17 +142,19 @@ def main() -> None:
     with rendered_tabs[1]:
         results_view(state)
     with rendered_tabs[2]:
-        group_picks_view(participant, state)
+        standings_view(state)
     with rendered_tabs[3]:
-        final_picks_view(participant, state)
+        group_picks_view(participant, state)
     with rendered_tabs[4]:
-        ranking_view(state, active_group.group_id)
+        final_picks_view(participant, state)
     with rendered_tabs[5]:
-        detail_view(state, active_group.group_id)
+        ranking_view(state, active_group.group_id)
     with rendered_tabs[6]:
+        detail_view(state, active_group.group_id)
+    with rendered_tabs[7]:
         account_view(participant, state, active_group)
     if role == "admin" or _is_group_admin(participant, active_group.group_id, state):
-        with rendered_tabs[7]:
+        with rendered_tabs[8]:
             admin_view(participant, state, active_group)
 
 
@@ -287,13 +290,8 @@ def match_predictions_view(participant: str, state: dict[str, Any]) -> None:
     store = get_store()
     now = now_bogota()
     predictions = {(pred.participant, pred.match_id): pred for pred in state["predictions"]}
-    matches_by_phase: dict[str, list[MatchResult]] = defaultdict(list)
-    for match in state["matches"]:
-        matches_by_phase[match.phase or "Sin fase"].append(match)
-
-    phases = sorted(matches_by_phase)
-    selected_phase = st.selectbox("Grupo o fase", phases, key="match_phase_filter")
-    selected_matches = sorted(matches_by_phase[selected_phase], key=lambda item: item.kickoff_at or datetime.max.replace(tzinfo=BOGOTA))
+    selected_phase, selected_date = _group_date_filters(state["matches"], "match")
+    selected_matches = _filter_matches(state["matches"], selected_phase, selected_date)
     participant_predictions = [pred for pred in state["predictions"] if pred.participant == participant]
     saved_count = len({pred.match_id for pred in participant_predictions if pred.goals_a_pred is not None and pred.goals_b_pred is not None})
     open_count = sum(1 for match in state["matches"] if not match.kickoff_at or now < match.kickoff_at)
@@ -386,12 +384,18 @@ def ranking_view(state: dict[str, Any], group_id: str) -> None:
 
 
 def results_view(state: dict[str, Any]) -> None:
+    confirmed_results = [result for result in state["results"] if result.confirmed]
+    if not confirmed_results:
+        st.info("Todavia no hay resultados reales confirmados.")
+        return
+
+    selected_phase, selected_date = _group_date_filters(confirmed_results, "results")
     results = sorted(
-        [result for result in state["results"] if result.confirmed],
+        _filter_matches(confirmed_results, selected_phase, selected_date),
         key=lambda item: item.kickoff_at or datetime.max.replace(tzinfo=BOGOTA),
     )
     if not results:
-        st.info("Todavia no hay resultados reales confirmados.")
+        st.info("No hay resultados confirmados para esos filtros.")
         return
 
     st.markdown(f'<div class="section-title">Resultados confirmados <span>{len(results)}</span></div>', unsafe_allow_html=True)
@@ -419,6 +423,27 @@ def results_view(state: dict[str, Any]) -> None:
                 """,
                 unsafe_allow_html=True,
             )
+
+
+def standings_view(state: dict[str, Any]) -> None:
+    selected_phase, selected_date = _group_date_filters(state["matches"], "standings")
+    filtered_results = [
+        result
+        for result in state["results"]
+        if result.confirmed and _matches_date(result, selected_date, include_before=True)
+    ]
+    standings_by_group = calculate_group_standings(state["matches"], filtered_results)
+    groups = [group for group in sorted(standings_by_group) if selected_phase == "Todos" or group == selected_phase]
+    if not groups:
+        st.info("No hay grupos para esos filtros.")
+        return
+    source_names = sorted({result.source for result in filtered_results if result.source})
+    source_text = ", ".join(source_names) if source_names else "resultados confirmados"
+    st.caption(f"Tabla calculada desde resultados confirmados. Fuente: {source_text}.")
+    for group in groups:
+        rows = standings_by_group[group]
+        st.markdown(f'<div class="section-title">{escape(group)} <span>{len(rows)}</span></div>', unsafe_allow_html=True)
+        st.markdown(_standings_table_html(rows), unsafe_allow_html=True)
 
 
 def detail_view(state: dict[str, Any], group_id: str) -> None:
@@ -837,6 +862,76 @@ def _team_html(team: str) -> str:
     if not code:
         return safe_team
     return f'<span class="team-with-flag"><img src="https://flagcdn.com/{code}.svg" alt="" loading="lazy" />{safe_team}</span>'
+
+
+def _group_date_filters(matches: list[MatchResult], key_prefix: str) -> tuple[str, str]:
+    phases = sorted({match.phase or "Sin fase" for match in matches})
+    date_options = _date_filter_options(matches)
+    col_group, col_date = st.columns(2)
+    selected_phase = col_group.selectbox("Grupo o fase", ["Todos"] + phases, key=f"{key_prefix}_phase_filter")
+    selected_date = col_date.selectbox("Fecha", ["Todas"] + date_options, key=f"{key_prefix}_date_filter")
+    return selected_phase, selected_date
+
+
+def _filter_matches(matches: list[MatchResult], selected_phase: str, selected_date: str) -> list[MatchResult]:
+    return sorted(
+        [
+            match
+            for match in matches
+            if _matches_phase(match, selected_phase) and _matches_date(match, selected_date)
+        ],
+        key=lambda item: item.kickoff_at or datetime.max.replace(tzinfo=BOGOTA),
+    )
+
+
+def _matches_phase(match: MatchResult, selected_phase: str) -> bool:
+    return selected_phase == "Todos" or (match.phase or "Sin fase") == selected_phase
+
+
+def _matches_date(match: MatchResult, selected_date: str, include_before: bool = False) -> bool:
+    if selected_date == "Todas":
+        return True
+    if not match.kickoff_at:
+        return False
+    match_date = match.kickoff_at.strftime("%Y-%m-%d")
+    return match_date <= selected_date if include_before else match_date == selected_date
+
+
+def _date_filter_options(matches: list[MatchResult]) -> list[str]:
+    return sorted({match.kickoff_at.strftime("%Y-%m-%d") for match in matches if match.kickoff_at})
+
+
+def _standings_table_html(rows: list[Any]) -> str:
+    body = []
+    for idx, row in enumerate(rows, start=1):
+        body.append(
+            f"""
+            <tr>
+              <td class="standing-rank">{idx}</td>
+              <td class="standing-team">{_team_html(row.team)}</td>
+              <td>{row.played}</td>
+              <td>{row.won}</td>
+              <td>{row.drawn}</td>
+              <td>{row.lost}</td>
+              <td>{row.goals_for}</td>
+              <td>{row.goals_against}</td>
+              <td>{row.goal_difference:+d}</td>
+              <td class="standing-points">{row.points}</td>
+            </tr>
+            """
+        )
+    return f"""
+    <div class="standings-wrap">
+      <table class="standings-table">
+        <thead>
+          <tr>
+            <th>#</th><th>Equipo</th><th>PJ</th><th>PG</th><th>PE</th><th>PP</th><th>GF</th><th>GC</th><th>DG</th><th>Pts</th>
+          </tr>
+        </thead>
+        <tbody>{''.join(body)}</tbody>
+      </table>
+    </div>
+    """
 
 
 def _broadcast_channels(broadcasts: dict[str, Any], match_id: str) -> list[str]:
@@ -1319,6 +1414,53 @@ def inject_styles() -> None:
             justify-content: flex-end;
             text-align: right;
         }
+        .standings-wrap {
+            width: 100%;
+            overflow-x: auto;
+            margin-bottom: 1rem;
+            border: 1px solid var(--exe-border);
+            border-radius: 8px;
+            background: var(--exe-surface);
+            box-shadow: 0 8px 18px rgba(8, 33, 66, 0.05);
+        }
+        .standings-table {
+            width: 100%;
+            min-width: 680px;
+            border-collapse: collapse;
+            font-size: 0.86rem;
+        }
+        .standings-table th,
+        .standings-table td {
+            padding: 0.58rem 0.62rem;
+            border-bottom: 1px solid var(--exe-border);
+            text-align: center;
+            white-space: nowrap;
+        }
+        .standings-table th {
+            color: var(--exe-muted);
+            background: var(--exe-surface-soft);
+            font-size: 0.72rem;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+        .standings-table tr:last-child td {
+            border-bottom: 0;
+        }
+        .standings-team {
+            min-width: 190px;
+            text-align: left !important;
+            color: var(--exe-ink);
+            font-weight: 900;
+        }
+        .standing-rank {
+            color: var(--exe-muted);
+            font-weight: 900;
+        }
+        .standing-points {
+            color: var(--exe-blue-dark);
+            font-size: 1rem;
+            font-weight: 950;
+        }
         .ranking-row {
             display: flex;
             justify-content: space-between;
@@ -1508,6 +1650,7 @@ def inject_styles() -> None:
             .ranking-row.rank-3 { background: linear-gradient(135deg, rgba(17, 85, 217, 0.16), var(--exe-surface) 74%); }
             .rank-points strong,
             .detail-score-grid strong,
+            .standing-points,
             .score-separator {
                 color: #f7fbff;
             }

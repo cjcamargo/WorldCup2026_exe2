@@ -13,6 +13,7 @@ from polla.emailer import build_changes_email, send_messages
 from polla.models import MatchResult
 from polla.results import update_results_from_sources
 from polla.scoring import score_all
+from polla.standings import calculate_group_standings
 from polla.supabase_store import SupabaseStore
 from polla.timeutils import now_bogota
 
@@ -57,6 +58,7 @@ def main() -> int:
         matches,
         points,
     )
+    group_standings = calculate_group_standings(matches, updated_results)
 
     audit_changes = store.audit_changes_after(settings.get("last_audit_email_at"))
     email_logs: list[str] = []
@@ -80,6 +82,7 @@ def main() -> int:
     print(f"Resultados confirmados: {len(updated_results)}")
     print(f"Resultados nuevos: {', '.join(new_results) if new_results else 'ninguno'}")
     print(f"Ranking filas: {len(ranking)}")
+    print(f"Tablas de grupo calculadas: {len(group_standings)}")
     print(f"Cambios auditados enviados: {len(audit_changes)}")
     for log in email_logs:
         print(log)
