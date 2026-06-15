@@ -681,6 +681,14 @@ def _match_prediction_card(
     locked = bool(match.kickoff_at and now >= match.kickoff_at)
     caption = match.kickoff_at.strftime("%Y-%m-%d %H:%M") if match.kickoff_at else "Horario por definir"
     status = "Cerrado" if locked else "Abierto"
+    just_saved = st.session_state.pop("last_saved_prediction", None) == match.match_id
+    is_saved = bool(
+        pred
+        and pred.goals_a_pred is not None
+        and pred.goals_b_pred is not None
+    ) or just_saved
+    saved_badge = '<span class="prediction-saved-flag">Guardado</span>' if is_saved else ""
+    saved_note = '<div class="prediction-saved-note">Prediccion guardada correctamente.</div>' if just_saved else ""
     with st.container(border=True):
         st.markdown(
             f"""
@@ -689,7 +697,10 @@ def _match_prediction_card(
                 <span class="match-id">{match.match_id}</span>
                 <div class="match-time">{caption}</div>
               </div>
-              <span class="match-status {'locked' if locked else 'open'}">{status}</span>
+              <div class="match-badges">
+                {saved_badge}
+                <span class="match-status {'locked' if locked else 'open'}">{status}</span>
+              </div>
             </div>
             <div class="match-title">
               <span>{_team_html(match.team_a)}</span>
@@ -697,6 +708,7 @@ def _match_prediction_card(
               <span>{_team_html(match.team_b)}</span>
             </div>
             {_broadcast_html(_broadcast_channels(broadcasts, match.match_id))}
+            {saved_note}
             """,
             unsafe_allow_html=True,
         )
@@ -727,6 +739,7 @@ def _match_prediction_card(
         if submitted:
             try:
                 store.save_prediction(participant, match, int(goals_a), int(goals_b), now)
+                st.session_state["last_saved_prediction"] = match.match_id
                 load_state.clear()
                 st.success("Marcador guardado.")
                 st.rerun()
@@ -1342,6 +1355,33 @@ def inject_styles() -> None:
             padding: 0.18rem 0.55rem;
             white-space: nowrap;
         }
+        .match-badges {
+            display: inline-flex;
+            align-items: center;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+            gap: 0.3rem;
+        }
+        .prediction-saved-flag {
+            border-radius: 999px;
+            font-size: 0.72rem;
+            font-weight: 900;
+            padding: 0.18rem 0.55rem;
+            color: #14532d;
+            background: #dcfce7;
+            border: 1px solid #86efac;
+            white-space: nowrap;
+        }
+        .prediction-saved-note {
+            margin-top: 0.48rem;
+            padding: 0.42rem 0.55rem;
+            border-radius: 8px;
+            color: #14532d;
+            background: #dcfce7;
+            border: 1px solid #86efac;
+            font-size: 0.78rem;
+            font-weight: 850;
+        }
         .match-status.open {
             background: var(--exe-green-soft);
             color: #166534;
@@ -1773,6 +1813,12 @@ def inject_styles() -> None:
                 background: rgba(57, 230, 0, 0.12);
                 color: #bbf7d0;
                 border-color: rgba(187, 247, 208, 0.28);
+            }
+            .prediction-saved-flag,
+            .prediction-saved-note {
+                color: #bbf7d0;
+                background: rgba(34, 197, 94, 0.14);
+                border-color: rgba(187, 247, 208, 0.32);
             }
             .broadcast-row strong {
                 background: #1d4ed8;
