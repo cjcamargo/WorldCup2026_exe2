@@ -103,6 +103,7 @@ def load_state() -> dict[str, Any]:
         "results": store.results(),
         "settings": store.settings(),
         "points": load_json(config_path("puntajes.json")),
+        "broadcasts": load_json(config_path("televisacion.json")),
     }
 
 
@@ -306,7 +307,7 @@ def match_predictions_view(participant: str, state: dict[str, Any]) -> None:
     grid = st.columns(2)
     for idx, match in enumerate(selected_matches):
         with grid[idx % 2]:
-            _match_prediction_card(store, participant, match, predictions.get((participant, match.match_id)), now)
+            _match_prediction_card(store, participant, match, predictions.get((participant, match.match_id)), now, state["broadcasts"])
 
 
 def group_picks_view(participant: str, state: dict[str, Any]) -> None:
@@ -398,6 +399,7 @@ def results_view(state: dict[str, Any]) -> None:
         score = _score_text(result.goals_a_real, result.goals_b_real)
         kickoff = result.kickoff_at.strftime("%Y-%m-%d %H:%M") if result.kickoff_at else "Horario por definir"
         source = result.source or "Automatico"
+        broadcast_html = _broadcast_html(_broadcast_channels(state["broadcasts"], result.match_id))
         with st.container(border=True):
             st.markdown(
                 f"""
@@ -410,6 +412,7 @@ def results_view(state: dict[str, Any]) -> None:
                       <span>{_team_html(result.team_b)}</span>
                     </div>
                     <div class="match-time">{kickoff} - Fuente: {source}</div>
+                    {broadcast_html}
                   </div>
                   <span class="match-status open">Confirmado</span>
                 </div>
@@ -640,6 +643,7 @@ def _match_prediction_card(
     match: MatchResult,
     pred: Any,
     now: datetime,
+    broadcasts: dict[str, Any],
 ) -> None:
     locked = bool(match.kickoff_at and now >= match.kickoff_at)
     caption = match.kickoff_at.strftime("%Y-%m-%d %H:%M") if match.kickoff_at else "Horario por definir"
@@ -659,6 +663,7 @@ def _match_prediction_card(
               <span class="versus">vs</span>
               <span>{_team_html(match.team_b)}</span>
             </div>
+            {_broadcast_html(_broadcast_channels(broadcasts, match.match_id))}
             """,
             unsafe_allow_html=True,
         )
@@ -832,6 +837,19 @@ def _team_html(team: str) -> str:
     if not code:
         return safe_team
     return f'<span class="team-with-flag"><img src="https://flagcdn.com/{code}.svg" alt="" loading="lazy" />{safe_team}</span>'
+
+
+def _broadcast_channels(broadcasts: dict[str, Any], match_id: str) -> list[str]:
+    matches = broadcasts.get("matches") or {}
+    channels = matches.get(match_id) or []
+    return [str(channel) for channel in channels if channel]
+
+
+def _broadcast_html(channels: list[str]) -> str:
+    if not channels:
+        return ""
+    chips = "".join(f'<span>{escape(channel)}</span>' for channel in channels)
+    return f'<div class="broadcast-row"><strong>TV</strong>{chips}</div>'
 
 
 def _clean_participant(value: str) -> str:
@@ -1219,6 +1237,34 @@ def inject_styles() -> None:
             font-size: 0.78rem;
             margin-top: 0.16rem;
         }
+        .broadcast-row {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.28rem;
+            margin-top: 0.48rem;
+        }
+        .broadcast-row strong,
+        .broadcast-row span {
+            display: inline-flex;
+            align-items: center;
+            min-height: 22px;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            font-weight: 850;
+            line-height: 1;
+        }
+        .broadcast-row strong {
+            padding: 0 0.42rem;
+            color: #ffffff;
+            background: var(--exe-blue-dark);
+        }
+        .broadcast-row span {
+            padding: 0 0.5rem;
+            color: #0f2a44;
+            background: #eef5ff;
+            border: 1px solid #d9e8ff;
+        }
         .score-separator {
             display: flex;
             align-items: center;
@@ -1479,6 +1525,15 @@ def inject_styles() -> None:
                 background: rgba(57, 230, 0, 0.12);
                 color: #bbf7d0;
                 border-color: rgba(187, 247, 208, 0.28);
+            }
+            .broadcast-row strong {
+                background: #1d4ed8;
+                color: #ffffff;
+            }
+            .broadcast-row span {
+                background: #111f33;
+                border-color: #2a3b55;
+                color: #dbe7f5;
             }
         }
         @media (max-width: 760px) {
