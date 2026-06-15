@@ -133,28 +133,26 @@ def main() -> None:
 
     _group_selector(participant, state, active_group)
 
-    tabs = ["Mis marcadores", "Resultados", "Posiciones", "Top 3 grupos", "Finales", "Ranking", "Detalle", "Mi cuenta"]
+    tabs = ["Mis marcadores", "Posiciones", "Ranking", "Top 3 grupos", "Finales", "Detalle", "Mi cuenta"]
     if role == "admin" or _is_group_admin(participant, active_group.group_id, state):
         tabs.append("Admin")
     rendered_tabs = st.tabs(tabs)
     with rendered_tabs[0]:
         match_predictions_view(participant, state)
     with rendered_tabs[1]:
-        results_view(state)
-    with rendered_tabs[2]:
         standings_view(state)
+    with rendered_tabs[2]:
+        ranking_view(state, active_group.group_id)
     with rendered_tabs[3]:
         group_picks_view(participant, state)
     with rendered_tabs[4]:
         final_picks_view(participant, state)
     with rendered_tabs[5]:
-        ranking_view(state, active_group.group_id)
-    with rendered_tabs[6]:
         detail_view(state, active_group.group_id)
-    with rendered_tabs[7]:
+    with rendered_tabs[6]:
         account_view(participant, state, active_group)
     if role == "admin" or _is_group_admin(participant, active_group.group_id, state):
-        with rendered_tabs[8]:
+        with rendered_tabs[7]:
             admin_view(participant, state, active_group)
 
 
