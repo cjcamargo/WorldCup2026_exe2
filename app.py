@@ -689,29 +689,29 @@ def _match_prediction_card(
     ) or just_saved
     saved_badge = '<span class="prediction-saved-flag">Guardado</span>' if is_saved else ""
     saved_note = '<div class="prediction-saved-note">Prediccion guardada correctamente.</div>' if just_saved else ""
+    badges_html = (
+        '<div class="match-badges">'
+        f'{saved_badge}<span class="match-status {"locked" if locked else "open"}">{status}</span>'
+        "</div>"
+    )
+    card_header_html = (
+        '<div class="match-card-top">'
+        f'<div><span class="match-id">{escape(match.match_id)}</span><div class="match-time">{escape(caption)}</div></div>'
+        f"{badges_html}"
+        "</div>"
+    )
+    card_intro_html = (
+        f"{card_header_html}"
+        '<div class="match-title">'
+        f"<span>{_team_html(match.team_a)}</span>"
+        '<span class="versus">vs</span>'
+        f"<span>{_team_html(match.team_b)}</span>"
+        "</div>"
+        f'{_broadcast_html(_broadcast_channels(broadcasts, match.match_id))}'
+        f"{saved_note}"
+    )
     with st.container(border=True):
-        st.markdown(
-            f"""
-            <div class="match-card-top">
-              <div>
-                <span class="match-id">{match.match_id}</span>
-                <div class="match-time">{caption}</div>
-              </div>
-              <div class="match-badges">
-                {saved_badge}
-                <span class="match-status {'locked' if locked else 'open'}">{status}</span>
-              </div>
-            </div>
-            <div class="match-title">
-              <span>{_team_html(match.team_a)}</span>
-              <span class="versus">vs</span>
-              <span>{_team_html(match.team_b)}</span>
-            </div>
-            {_broadcast_html(_broadcast_channels(broadcasts, match.match_id))}
-            {saved_note}
-            """,
-            unsafe_allow_html=True,
-        )
+        st.markdown(card_intro_html, unsafe_allow_html=True)
         with st.form(f"pred_{match.match_id}"):
             col_a, score_sep, col_b, col_save = st.columns([0.8, 0.18, 0.8, 0.75], vertical_alignment="bottom")
             goals_a = col_a.number_input(
