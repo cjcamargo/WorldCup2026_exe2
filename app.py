@@ -13,7 +13,7 @@ from polla.config import config_path, load_json
 from polla.emailer import build_group_join_request_email, send_messages
 from polla.models import FinalPicks, GroupPick, MatchResult
 from polla.scoring import score_all
-from polla.standings import calculate_group_standings
+from polla.standings import calculate_group_standings, payload_to_standings
 from polla.store import hash_pin, verify_pin
 from polla.supabase_store import SupabaseStore
 from polla.timeutils import BOGOTA, now_bogota
@@ -432,18 +432,28 @@ def standings_view(state: dict[str, Any]) -> None:
         for result in state["results"]
         if result.confirmed and _matches_date(result, selected_date, include_before=True)
     ]
-    standings_by_group = calculate_group_standings(state["matches"], filtered_results)
-    groups = [group for group in sorted(standings_by_group) if selected_phase == "Todos" or group == selected_phase]
+    standings_payload = state["settings"].get("group_standings")
+    use_saved_standings = selected_date == "Todas" and standings_payload
+    if use_saved_standings:
+        standings_by_group = payload_to_standings(standings_payload)
+    else:
+        standings_by_group = calculate_group_standings(state["matches"], filtered_results)
+    groups = _standings_groups_for_filter(standings_by_group, state["matches"], selected_phase)
     if not groups:
         st.info("No hay grupos para esos filtros.")
         return
-    source_names = sorted({result.source for result in filtered_results if result.source})
-    source_text = ", ".join(source_names) if source_names else "resultados confirmados"
-    st.caption(f"Tabla calculada desde resultados confirmados. Fuente: {source_text}.")
+    st.caption(_standings_source_text(standings_payload, use_saved_standings, filtered_results))
     for group in groups:
         rows = standings_by_group[group]
-        st.markdown(f'<div class="section-title">{escape(group)} <span>{len(rows)}</span></div>', unsafe_allow_html=True)
+        display_group = selected_phase if selected_phase != "Todos" else group
+        st.markdown(f'<div class="section-title">{escape(display_group)} <span>{len(rows)}</span></div>', unsafe_allow_html=True)
         st.markdown(_standings_table_html(rows), unsafe_allow_html=True)
+        result_phase = selected_phase if selected_phase != "Todos" else group
+        group_results = _filter_matches(filtered_results, result_phase, selected_date)
+        if group_results:
+            st.markdown('<div class="mini-section-title">Resultados del filtro</div>', unsafe_allow_html=True)
+            for result in group_results:
+                st.markdown(_compact_result_html(result), unsafe_allow_html=True)
 
 
 def detail_view(state: dict[str, Any], group_id: str) -> None:
@@ -901,37 +911,78 @@ def _date_filter_options(matches: list[MatchResult]) -> list[str]:
     return sorted({match.kickoff_at.strftime("%Y-%m-%d") for match in matches if match.kickoff_at})
 
 
+def _standings_groups_for_filter(
+    standings_by_group: dict[str, list[Any]],
+    matches: list[MatchResult],
+    selected_phase: str,
+) -> list[str]:
+    if selected_phase == "Todos":
+        return sorted(standings_by_group)
+    if selected_phase in standings_by_group:
+        return [selected_phase]
+    selected_teams = set(_teams_by_group(matches).get(selected_phase, []))
+    if not selected_teams:
+        return []
+    matches_by_overlap = []
+    for group, rows in standings_by_group.items():
+        row_teams = {row.team for row in rows}
+        overlap = len(selected_teams & row_teams)
+        if overlap:
+            matches_by_overlap.append((overlap, group))
+    return [group for _overlap, group in sorted(matches_by_overlap, reverse=True)[:1]]
+
+
 def _standings_table_html(rows: list[Any]) -> str:
-    body = []
+    body = ""
     for idx, row in enumerate(rows, start=1):
-        body.append(
-            f"""
-            <tr>
-              <td class="standing-rank">{idx}</td>
-              <td class="standing-team">{_team_html(row.team)}</td>
-              <td>{row.played}</td>
-              <td>{row.won}</td>
-              <td>{row.drawn}</td>
-              <td>{row.lost}</td>
-              <td>{row.goals_for}</td>
-              <td>{row.goals_against}</td>
-              <td>{row.goal_difference:+d}</td>
-              <td class="standing-points">{row.points}</td>
-            </tr>
-            """
+        body += (
+            "<tr>"
+            f'<td class="standing-rank">{idx}</td>'
+            f'<td class="standing-team">{_team_html(row.team)}</td>'
+            f"<td>{row.played}</td>"
+            f"<td>{row.won}</td>"
+            f"<td>{row.drawn}</td>"
+            f"<td>{row.lost}</td>"
+            f"<td>{row.goals_for}</td>"
+            f"<td>{row.goals_against}</td>"
+            f"<td>{row.goal_difference:+d}</td>"
+            f'<td class="standing-points">{row.points}</td>'
+            "</tr>"
         )
-    return f"""
-    <div class="standings-wrap">
-      <table class="standings-table">
-        <thead>
-          <tr>
-            <th>#</th><th>Equipo</th><th>PJ</th><th>PG</th><th>PE</th><th>PP</th><th>GF</th><th>GC</th><th>DG</th><th>Pts</th>
-          </tr>
-        </thead>
-        <tbody>{''.join(body)}</tbody>
-      </table>
-    </div>
-    """
+    return (
+        '<div class="standings-wrap"><table class="standings-table"><thead><tr>'
+        "<th>#</th><th>Equipo</th><th>PJ</th><th>PG</th><th>PE</th><th>PP</th><th>GF</th><th>GC</th><th>DG</th><th>Pts</th>"
+        f"</tr></thead><tbody>{body}</tbody></table></div>"
+    )
+
+
+def _compact_result_html(result: MatchResult) -> str:
+    score = _score_text(result.goals_a_real, result.goals_b_real)
+    kickoff = result.kickoff_at.strftime("%Y-%m-%d %H:%M") if result.kickoff_at else "Horario por definir"
+    source = escape(result.source or "Automatico")
+    return (
+        '<div class="compact-result">'
+        f'<span class="match-id">{escape(result.match_id)}</span>'
+        f'<span>{_team_html(result.team_a)}</span>'
+        f"<strong>{escape(score)}</strong>"
+        f'<span>{_team_html(result.team_b)}</span>'
+        f'<small>{escape(kickoff)} - {source}</small>'
+        "</div>"
+    )
+
+
+def _standings_source_text(payload: Any, use_saved: bool, filtered_results: list[MatchResult]) -> str:
+    if use_saved:
+        if isinstance(payload, str):
+            import json
+            payload = json.loads(payload)
+        source = (payload or {}).get("source") or "standings guardados"
+        updated_at = (payload or {}).get("updated_at")
+        suffix = f" - Actualizado: {updated_at}" if updated_at else ""
+        return f"Tabla oficial/curada desde {source}{suffix}."
+    source_names = sorted({result.source for result in filtered_results if result.source})
+    source_text = ", ".join(source_names) if source_names else "resultados confirmados"
+    return f"Tabla calculada hasta la fecha seleccionada. Fuente: {source_text}."
 
 
 def _broadcast_channels(broadcasts: dict[str, Any], match_id: str) -> list[str]:
@@ -1386,6 +1437,13 @@ def inject_styles() -> None:
             padding: 0.14rem 0.5rem;
             font-size: 0.78rem;
         }
+        .mini-section-title {
+            margin: 0.35rem 0 0.45rem;
+            color: var(--exe-muted);
+            font-size: 0.82rem;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
         .result-row {
             display: flex;
             align-items: center;
@@ -1413,6 +1471,31 @@ def inject_styles() -> None:
         .result-title span:last-child {
             justify-content: flex-end;
             text-align: right;
+        }
+        .compact-result {
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr);
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.45rem;
+            padding: 0.55rem 0.65rem;
+            border: 1px solid var(--exe-border);
+            border-radius: 8px;
+            background: var(--exe-surface);
+        }
+        .compact-result strong {
+            color: #ffffff;
+            background: var(--exe-blue-dark);
+            border-radius: 7px;
+            padding: 0.2rem 0.5rem;
+            font-weight: 950;
+            white-space: nowrap;
+        }
+        .compact-result small {
+            grid-column: 2 / -1;
+            color: var(--exe-muted);
+            font-size: 0.72rem;
+            font-weight: 750;
         }
         .standings-wrap {
             width: 100%;
@@ -1654,6 +1737,10 @@ def inject_styles() -> None:
             .score-separator {
                 color: #f7fbff;
             }
+            .compact-result strong {
+                background: #1d4ed8;
+                color: #ffffff;
+            }
             .rank-points span,
             .metric-card span,
             .detail-score-grid span {
@@ -1719,6 +1806,15 @@ def inject_styles() -> None:
             }
             .points-pill { margin-left: 0; }
             .detail-score-grid { grid-template-columns: 1fr; }
+            .compact-result {
+                grid-template-columns: auto minmax(0, 1fr) auto;
+            }
+            .compact-result span:nth-of-type(3) {
+                grid-column: 2 / -1;
+            }
+            .compact-result small {
+                grid-column: 2 / -1;
+            }
         }
         </style>
         """,

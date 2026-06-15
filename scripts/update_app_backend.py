@@ -13,7 +13,7 @@ from polla.emailer import build_changes_email, send_messages
 from polla.models import MatchResult
 from polla.results import update_results_from_sources
 from polla.scoring import score_all
-from polla.standings import calculate_group_standings
+from polla.standings import calculate_group_standings, fetch_espn_group_standings, standings_to_payload
 from polla.supabase_store import SupabaseStore
 from polla.timeutils import now_bogota
 
@@ -58,7 +58,15 @@ def main() -> int:
         matches,
         points,
     )
-    group_standings = calculate_group_standings(matches, updated_results)
+    group_standings_payload, standings_warnings = fetch_espn_group_standings(results_cfg.get("standings", {}))
+    if not group_standings_payload:
+        group_standings = calculate_group_standings(matches, updated_results)
+        group_standings_payload = standings_to_payload(
+            group_standings,
+            source="Calculado desde resultados confirmados",
+        )
+    else:
+        group_standings = group_standings_payload.get("groups", {})
 
     audit_changes = store.audit_changes_after(settings.get("last_audit_email_at"))
     email_logs: list[str] = []
@@ -73,6 +81,7 @@ def main() -> int:
         store.replace_rows("Results", [_result_row(result) for result in updated_results])
         store.replace_rows("Ranking", ranking)
         store.replace_rows("Detail", _fit_detail_rows(detail))
+        store.save_setting("group_standings", group_standings_payload)
         if audit_changes:
             store.save_setting("last_audit_email_at", max(change.detected_at for change in audit_changes))
         store.save_setting("last_backend_run_at", now_bogota().isoformat())
@@ -87,6 +96,8 @@ def main() -> int:
     for log in email_logs:
         print(log)
     for warning in result_warnings:
+        print(f"WARNING: {warning}")
+    for warning in standings_warnings:
         print(f"WARNING: {warning}")
     return 0
 

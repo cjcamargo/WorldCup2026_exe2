@@ -6,6 +6,13 @@
   "result_timeout_hours_after_kickoff": 24,
   "group_stage_expected_minutes": 120,
   "knockout_expected_minutes": 180,
+  "standings": {
+    "urls": [
+      "https://site.web.api.espn.com/apis/v2/sports/soccer/fifa.world/standings?season=2026",
+      "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/standings?season=2026"
+    ],
+    "timeout_seconds": 45
+  },
   "sources": [
     {
       "name": "espn_world_cup_scoreboard",

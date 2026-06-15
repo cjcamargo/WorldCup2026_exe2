@@ -388,4 +388,10 @@ def _decode(value: Any) -> Any:
     text = str(value)
     if text.casefold() in {"true", "false"}:
         return text.casefold() == "true"
+    if text[:1] in {"{", "["}:
+        import json
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            return text
     return text
