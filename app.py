@@ -446,12 +446,7 @@ def standings_view(state: dict[str, Any]) -> None:
         display_group = selected_phase if selected_phase != "Todos" else group
         st.markdown(f'<div class="section-title">{escape(display_group)} <span>{len(rows)}</span></div>', unsafe_allow_html=True)
         st.markdown(_standings_table_html(rows), unsafe_allow_html=True)
-        result_phase = selected_phase if selected_phase != "Todos" else group
-        group_results = _filter_matches(filtered_results, result_phase, selected_date)
-        if group_results:
-            st.markdown('<div class="mini-section-title">Resultados del filtro</div>', unsafe_allow_html=True)
-            for result in group_results:
-                st.markdown(_compact_result_html(result), unsafe_allow_html=True)
+    _standings_results_section(filtered_results, selected_phase, selected_date)
 
 
 def detail_view(state: dict[str, Any], group_id: str) -> None:
@@ -961,6 +956,25 @@ def _standings_groups_for_filter(
         if overlap:
             matches_by_overlap.append((overlap, group))
     return [group for _overlap, group in sorted(matches_by_overlap, reverse=True)[:1]]
+
+
+def _standings_results_section(
+    filtered_results: list[MatchResult],
+    selected_phase: str,
+    selected_date: date | None,
+) -> None:
+    result_phase = selected_phase
+    rows = _filter_matches(filtered_results, result_phase, selected_date)
+    if not rows:
+        st.markdown('<div class="mini-section-title">Resultados confirmados</div>', unsafe_allow_html=True)
+        st.info("No hay resultados confirmados para esos filtros.")
+        return
+    title = "Resultados confirmados"
+    if selected_phase != "Todos":
+        title += f" - {selected_phase}"
+    st.markdown(f'<div class="section-title">{escape(title)} <span>{len(rows)}</span></div>', unsafe_allow_html=True)
+    for result in rows:
+        st.markdown(_compact_result_html(result), unsafe_allow_html=True)
 
 
 def _standings_table_html(rows: list[Any]) -> str:
