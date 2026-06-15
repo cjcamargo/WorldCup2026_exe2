@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import base64
 from collections import defaultdict
-from datetime import datetime
+from datetime import date, datetime
 from html import escape
 from pathlib import Path
 from typing import Any
@@ -431,7 +431,7 @@ def standings_view(state: dict[str, Any]) -> None:
         if result.confirmed and _matches_date(result, selected_date, include_before=True)
     ]
     standings_payload = state["settings"].get("group_standings")
-    use_saved_standings = selected_date == "Todas" and standings_payload
+    use_saved_standings = selected_date is None and standings_payload
     if use_saved_standings:
         standings_by_group = payload_to_standings(standings_payload)
     else:
@@ -872,16 +872,25 @@ def _team_html(team: str) -> str:
     return f'<span class="team-with-flag"><img src="https://flagcdn.com/{code}.svg" alt="" loading="lazy" />{safe_team}</span>'
 
 
-def _group_date_filters(matches: list[MatchResult], key_prefix: str) -> tuple[str, str]:
+def _group_date_filters(matches: list[MatchResult], key_prefix: str) -> tuple[str, date | None]:
     phases = sorted({match.phase or "Sin fase" for match in matches})
     date_options = _date_filter_options(matches)
     col_group, col_date = st.columns(2)
     selected_phase = col_group.selectbox("Grupo o fase", ["Todos"] + phases, key=f"{key_prefix}_phase_filter")
-    selected_date = col_date.selectbox("Fecha", ["Todas"] + date_options, key=f"{key_prefix}_date_filter")
+    all_dates = col_date.checkbox("Todas las fechas", value=False, key=f"{key_prefix}_all_dates")
+    selected_date = None
+    if not all_dates:
+        selected_date = col_date.date_input(
+            "Fecha",
+            value=_default_filter_date(date_options),
+            min_value=min(date_options) if date_options else None,
+            max_value=max(date_options) if date_options else None,
+            key=f"{key_prefix}_date_filter",
+        )
     return selected_phase, selected_date
 
 
-def _filter_matches(matches: list[MatchResult], selected_phase: str, selected_date: str) -> list[MatchResult]:
+def _filter_matches(matches: list[MatchResult], selected_phase: str, selected_date: date | None) -> list[MatchResult]:
     return sorted(
         [
             match
@@ -896,17 +905,28 @@ def _matches_phase(match: MatchResult, selected_phase: str) -> bool:
     return selected_phase == "Todos" or (match.phase or "Sin fase") == selected_phase
 
 
-def _matches_date(match: MatchResult, selected_date: str, include_before: bool = False) -> bool:
-    if selected_date == "Todas":
+def _matches_date(match: MatchResult, selected_date: date | None, include_before: bool = False) -> bool:
+    if selected_date is None:
         return True
     if not match.kickoff_at:
         return False
-    match_date = match.kickoff_at.strftime("%Y-%m-%d")
+    match_date = match.kickoff_at.date()
     return match_date <= selected_date if include_before else match_date == selected_date
 
 
-def _date_filter_options(matches: list[MatchResult]) -> list[str]:
-    return sorted({match.kickoff_at.strftime("%Y-%m-%d") for match in matches if match.kickoff_at})
+def _date_filter_options(matches: list[MatchResult]) -> list[date]:
+    return sorted({match.kickoff_at.date() for match in matches if match.kickoff_at})
+
+
+def _default_filter_date(options: list[date]) -> date:
+    today = now_bogota().date()
+    if not options:
+        return today
+    if today < min(options):
+        return min(options)
+    if today > max(options):
+        return max(options)
+    return today
 
 
 def _standings_groups_for_filter(
