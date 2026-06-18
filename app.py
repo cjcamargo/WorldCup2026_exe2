@@ -1026,23 +1026,17 @@ def _prediction_comparison_html(
     rows = ""
     for participant in participants:
         prediction = predictions.get((participant, match.match_id))
-        has_prediction = bool(
-            prediction
-            and prediction.goals_a_pred is not None
-            and prediction.goals_b_pred is not None
-        )
-        score = (
-            f"{prediction.goals_a_pred} - {prediction.goals_b_pred}"
-            if has_prediction
-            else "Sin prediccion"
-        )
-        status_class = "prediction-available" if has_prediction else "prediction-missing"
+        if not prediction or prediction.goals_a_pred is None or prediction.goals_b_pred is None:
+            continue
+        score = f"{prediction.goals_a_pred} - {prediction.goals_b_pred}"
         rows += (
             '<div class="shared-prediction-row">'
             f'<span class="shared-prediction-user">{escape(participant)}</span>'
-            f'<strong class="{status_class}">{escape(score)}</strong>'
+            f'<strong class="prediction-available">{escape(score)}</strong>'
             "</div>"
         )
+    if not rows:
+        rows = '<div class="shared-predictions-empty">Nadie registro una prediccion para este partido.</div>'
     kickoff = match.kickoff_at.strftime("%Y-%m-%d %H:%M") if match.kickoff_at else "Horario por definir"
     return (
         '<div class="shared-predictions-card">'
@@ -1695,10 +1689,12 @@ def inject_styles() -> None:
             color: #ffffff;
             background: var(--exe-blue-dark);
         }
-        .prediction-missing {
+        .shared-predictions-empty {
+            padding: 0.8rem;
+            text-align: center;
             color: var(--exe-muted);
-            background: var(--exe-surface-soft);
-            border: 1px solid var(--exe-border);
+            font-size: 0.8rem;
+            font-weight: 750;
         }
         .standings-wrap {
             width: 100%;
