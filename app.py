@@ -482,7 +482,7 @@ def standings_view(state: dict[str, Any]) -> None:
         display_group = selected_phase if selected_phase != "Todos" else group
         st.markdown(f'<div class="section-title">{escape(display_group)} <span>{len(rows)}</span></div>', unsafe_allow_html=True)
         st.markdown(_standings_table_html(rows), unsafe_allow_html=True)
-    _standings_results_section(filtered_results, selected_phase, selected_date)
+        _standings_group_results(filtered_results, display_group, selected_date)
 
 
 def detail_view(state: dict[str, Any], group_id: str) -> None:
@@ -999,21 +999,16 @@ def _standings_groups_for_filter(
     return [group for _overlap, group in sorted(matches_by_overlap, reverse=True)[:1]]
 
 
-def _standings_results_section(
+def _standings_group_results(
     filtered_results: list[MatchResult],
-    selected_phase: str,
+    group: str,
     selected_date: date | None,
 ) -> None:
-    result_phase = selected_phase
-    rows = _filter_matches(filtered_results, result_phase, selected_date)
+    rows = _filter_matches(filtered_results, group, selected_date)
     if not rows:
-        st.markdown('<div class="mini-section-title">Resultados confirmados</div>', unsafe_allow_html=True)
-        st.info("No hay resultados confirmados para esos filtros.")
+        st.markdown('<div class="group-results-empty">Sin resultados confirmados para este filtro.</div>', unsafe_allow_html=True)
         return
-    title = "Resultados confirmados"
-    if selected_phase != "Todos":
-        title += f" - {selected_phase}"
-    st.markdown(f'<div class="section-title">{escape(title)} <span>{len(rows)}</span></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="mini-section-title">Resultados del grupo <span>{len(rows)}</span></div>', unsafe_allow_html=True)
     for result in rows:
         st.markdown(_compact_result_html(result), unsafe_allow_html=True)
 
@@ -1585,11 +1580,28 @@ def inject_styles() -> None:
             font-size: 0.78rem;
         }
         .mini-section-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
             margin: 0.35rem 0 0.45rem;
             color: var(--exe-muted);
             font-size: 0.82rem;
             font-weight: 900;
             text-transform: uppercase;
+        }
+        .mini-section-title span {
+            color: var(--exe-blue);
+            font-size: 0.74rem;
+        }
+        .group-results-empty {
+            margin: 0.35rem 0 1.2rem;
+            padding: 0.55rem 0.7rem;
+            border: 1px dashed var(--exe-border);
+            border-radius: 8px;
+            color: var(--exe-muted);
+            background: var(--exe-surface-soft);
+            font-size: 0.78rem;
+            font-weight: 750;
         }
         .result-row {
             display: flex;

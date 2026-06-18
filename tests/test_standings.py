@@ -56,6 +56,22 @@ def test_payload_roundtrip_preserves_standings_order():
     assert restored["Group A"][0].points == 3
 
 
+def test_saved_payload_is_sorted_by_points_and_goal_difference():
+    payload = {
+        "groups": {
+            "Group A": [
+                {"rank": 2, "team": "Japan", "points": 0, "goal_difference": -1, "goals_for": 1, "goals_against": 2},
+                {"rank": 3, "team": "Colombia", "points": 3, "goal_difference": 1, "goals_for": 2, "goals_against": 1},
+                {"rank": 1, "team": "Germany", "points": 3, "goal_difference": 2, "goals_for": 2, "goals_against": 0},
+            ]
+        }
+    }
+
+    standings = payload_to_standings(payload)["Group A"]
+
+    assert [row.team for row in standings] == ["Germany", "Colombia", "Japan"]
+
+
 def test_parse_espn_standings_payload_extracts_rows():
     payload = {
         "children": [
@@ -103,3 +119,36 @@ def test_parse_espn_standings_payload_extracts_rows():
     assert parsed["Group A"][0]["team"] == "Colombia"
     assert parsed["Group A"][0]["played"] == 2
     assert parsed["Group A"][0]["points"] == 4
+
+
+def test_espn_payload_is_reordered_by_competition_stats():
+    payload = {
+        "children": [
+            {
+                "name": "Group A",
+                "standings": {
+                    "entries": [
+                        {
+                            "team": {"displayName": "Japan"},
+                            "stats": [
+                                {"abbreviation": "PTS", "value": 0},
+                                {"abbreviation": "GD", "value": -1},
+                            ],
+                        },
+                        {
+                            "team": {"displayName": "Colombia"},
+                            "stats": [
+                                {"abbreviation": "PTS", "value": 3},
+                                {"abbreviation": "GD", "value": 1},
+                                {"abbreviation": "GF", "value": 2},
+                            ],
+                        },
+                    ]
+                },
+            }
+        ]
+    }
+
+    parsed = _parse_espn_standings_payload(payload)
+
+    assert [row["team"] for row in parsed["Group A"]] == ["Colombia", "Japan"]

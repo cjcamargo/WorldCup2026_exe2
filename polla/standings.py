@@ -14,6 +14,7 @@ from .timeutils import now_bogota
 class TeamStanding:
     group: str
     team: str
+    source_rank: int = 0
     played: int = 0
     won: int = 0
     drawn: int = 0
@@ -106,10 +107,11 @@ def payload_to_standings(payload: Any) -> dict[str, list[TeamStanding]]:
     groups = (payload or {}).get("groups") or {}
     out: dict[str, list[TeamStanding]] = {}
     for group, rows in groups.items():
-        out[group] = [
+        standings = [
             TeamStanding(
                 group=group,
                 team=str(row.get("team") or ""),
+                source_rank=int(row.get("rank") or 0),
                 played=int(row.get("played") or 0),
                 won=int(row.get("won") or 0),
                 drawn=int(row.get("drawn") or 0),
@@ -121,7 +123,22 @@ def payload_to_standings(payload: Any) -> dict[str, list[TeamStanding]]:
             )
             for row in rows
         ]
+        out[group] = sort_standings(standings)
     return out
+
+
+def sort_standings(rows: list[TeamStanding]) -> list[TeamStanding]:
+    return sorted(
+        rows,
+        key=lambda row: (
+            -row.points,
+            -row.goal_difference,
+            -row.goals_for,
+            row.goals_against,
+            row.source_rank if row.source_rank > 0 else 999,
+            row.team,
+        ),
+    )
 
 
 def _parse_espn_standings_payload(payload: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
@@ -129,25 +146,33 @@ def _parse_espn_standings_payload(payload: dict[str, Any]) -> dict[str, list[dic
     for node in _walk_dicts(payload):
         standings_node = node.get("standings")
         if isinstance(standings_node, dict) and isinstance(standings_node.get("entries"), list):
-            rows = [_parse_espn_entry(entry) for entry in standings_node["entries"] if isinstance(entry, dict)]
+            rows = [
+                _parse_espn_entry(entry, idx)
+                for idx, entry in enumerate(standings_node["entries"], start=1)
+                if isinstance(entry, dict)
+            ]
             rows = [row for row in rows if row and row.get("team")]
             group_name = _espn_group_name(node)
             if len(rows) >= 2 and _is_world_cup_group_name(group_name):
-                groups[group_name] = rows
+                groups[group_name] = _sort_payload_rows(rows)
         entries = node.get("entries")
         if not isinstance(entries, list) or not entries:
             continue
-        rows = [_parse_espn_entry(entry) for entry in entries if isinstance(entry, dict)]
+        rows = [
+            _parse_espn_entry(entry, idx)
+            for idx, entry in enumerate(entries, start=1)
+            if isinstance(entry, dict)
+        ]
         rows = [row for row in rows if row and row.get("team")]
         if len(rows) < 2:
             continue
         group_name = _espn_group_name(node)
         if _is_world_cup_group_name(group_name):
-            groups[group_name] = rows
+            groups[group_name] = _sort_payload_rows(rows)
     return groups
 
 
-def _parse_espn_entry(entry: dict[str, Any]) -> dict[str, Any] | None:
+def _parse_espn_entry(entry: dict[str, Any], fallback_rank: int = 0) -> dict[str, Any] | None:
     team = entry.get("team") or {}
     team_name = canonical_team_name(
         team.get("displayName") or team.get("shortDisplayName") or team.get("name") or entry.get("name") or ""
@@ -156,7 +181,7 @@ def _parse_espn_entry(entry: dict[str, Any]) -> dict[str, Any] | None:
         return None
     stats = _espn_stats(entry)
     return {
-        "rank": _to_int(entry.get("rank") or entry.get("position")),
+        "rank": _to_int(entry.get("rank") or entry.get("position")) or fallback_rank,
         "team": team_name,
         "played": _first_stat(stats, "GP", "P", "gamesPlayed", "played"),
         "won": _first_stat(stats, "W", "wins"),
@@ -165,8 +190,22 @@ def _parse_espn_entry(entry: dict[str, Any]) -> dict[str, Any] | None:
         "goals_for": _first_stat(stats, "F", "GF", "goalsFor", "pointsFor"),
         "goals_against": _first_stat(stats, "A", "GA", "goalsAgainst", "pointsAgainst"),
         "goal_difference": _first_stat(stats, "GD", "DIFF", "goalDifference", "differential"),
-        "points": _first_stat(stats, "PTS", "P", "points"),
+        "points": _first_stat(stats, "PTS", "points"),
     }
+
+
+def _sort_payload_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return sorted(
+        rows,
+        key=lambda row: (
+            -int(row.get("points") or 0),
+            -int(row.get("goal_difference") or 0),
+            -int(row.get("goals_for") or 0),
+            int(row.get("goals_against") or 0),
+            int(row.get("rank") or 999),
+            str(row.get("team") or ""),
+        ),
+    )
 
 
 def _espn_stats(entry: dict[str, Any]) -> dict[str, int]:
@@ -211,7 +250,7 @@ def _walk_dicts(value: Any):
 
 def _standing_to_dict(row: TeamStanding, rank: int) -> dict[str, Any]:
     return {
-        "rank": rank,
+        "rank": row.source_rank or rank,
         "team": row.team,
         "played": row.played,
         "won": row.won,
