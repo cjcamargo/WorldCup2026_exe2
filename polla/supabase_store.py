@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Any
 
 from .models import AuditChange, FinalPicks, GroupMembership, GroupPick, MatchResult, PollaGroup, Prediction, User
+from .prediction_rules import prediction_is_locked, prediction_lock_at
 from .schedule import canonical_team_name
 from .timeutils import as_bogota, parse_datetime
 
@@ -241,8 +242,10 @@ class SupabaseStore:
         ]
 
     def save_prediction(self, participant: str, match: MatchResult, goals_a: int | None, goals_b: int | None, at: datetime) -> None:
-        if match.kickoff_at and at >= match.kickoff_at:
-            raise ValueError("Este partido ya inicio y no puede editarse.")
+        if prediction_is_locked(match, at):
+            lock_at = prediction_lock_at(match)
+            lock_text = lock_at.strftime("%Y-%m-%d %H:%M") if lock_at else "el cierre"
+            raise ValueError(f"Las predicciones de este partido cerraron el {lock_text} hora Bogota.")
         values = {
             "participant": participant,
             "match_id": match.match_id,

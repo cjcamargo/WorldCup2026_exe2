@@ -12,6 +12,7 @@ import streamlit as st
 from polla.config import config_path, load_json
 from polla.emailer import build_group_join_request_email, send_messages
 from polla.models import FinalPicks, GroupPick, MatchResult
+from polla.prediction_rules import prediction_is_locked, prediction_lock_at, predictions_visible_for_date
 from polla.scoring import score_all
 from polla.standings import calculate_group_standings, payload_to_standings
 from polla.store import hash_pin, verify_pin
@@ -133,26 +134,28 @@ def main() -> None:
 
     _group_selector(participant, state, active_group)
 
-    tabs = ["Mis marcadores", "Posiciones", "Ranking", "Top 3 grupos", "Finales", "Detalle", "Mi cuenta"]
+    tabs = ["Mis marcadores", "Predicciones", "Posiciones", "Ranking", "Top 3 grupos", "Finales", "Detalle", "Mi cuenta"]
     if role == "admin" or _is_group_admin(participant, active_group.group_id, state):
         tabs.append("Admin")
     rendered_tabs = st.tabs(tabs)
     with rendered_tabs[0]:
         match_predictions_view(participant, state)
     with rendered_tabs[1]:
-        standings_view(state)
+        predictions_view(state, active_group.group_id)
     with rendered_tabs[2]:
-        ranking_view(state, active_group.group_id)
+        standings_view(state)
     with rendered_tabs[3]:
-        group_picks_view(participant, state)
+        ranking_view(state, active_group.group_id)
     with rendered_tabs[4]:
-        final_picks_view(participant, state)
+        group_picks_view(participant, state)
     with rendered_tabs[5]:
-        detail_view(state, active_group.group_id)
+        final_picks_view(participant, state)
     with rendered_tabs[6]:
+        detail_view(state, active_group.group_id)
+    with rendered_tabs[7]:
         account_view(participant, state, active_group)
     if role == "admin" or _is_group_admin(participant, active_group.group_id, state):
-        with rendered_tabs[7]:
+        with rendered_tabs[8]:
             admin_view(participant, state, active_group)
 
 
@@ -292,7 +295,7 @@ def match_predictions_view(participant: str, state: dict[str, Any]) -> None:
     selected_matches = _filter_matches(state["matches"], selected_phase, selected_date)
     participant_predictions = [pred for pred in state["predictions"] if pred.participant == participant]
     saved_count = len({pred.match_id for pred in participant_predictions if pred.goals_a_pred is not None and pred.goals_b_pred is not None})
-    open_count = sum(1 for match in state["matches"] if not match.kickoff_at or now < match.kickoff_at)
+    open_count = sum(1 for match in state["matches"] if not prediction_is_locked(match, now))
     locked_count = len(state["matches"]) - open_count
 
     metric_cols = st.columns(3)
@@ -304,6 +307,39 @@ def match_predictions_view(participant: str, state: dict[str, Any]) -> None:
     for idx, match in enumerate(selected_matches):
         with grid[idx % 2]:
             _match_prediction_card(store, participant, match, predictions.get((participant, match.match_id)), now, state["broadcasts"])
+
+
+def predictions_view(state: dict[str, Any], group_id: str) -> None:
+    date_options = _date_filter_options(state["matches"])
+    selected_date = st.date_input(
+        "Fecha de predicciones",
+        value=_default_filter_date(date_options),
+        min_value=min(date_options) if date_options else None,
+        max_value=max(date_options) if date_options else None,
+        key="shared_predictions_date",
+    )
+    now = now_bogota()
+    if not predictions_visible_for_date(selected_date, now):
+        st.info(f"Las predicciones del {selected_date.isoformat()} estaran visibles desde las 11:00 hora Bogota.")
+        return
+
+    matches = _filter_matches(state["matches"], "Todos", selected_date)
+    if not matches:
+        st.info("No hay partidos programados para esta fecha.")
+        return
+    participants = sorted(_active_participants_for_group(group_id, state))
+    predictions = {(pred.participant, pred.match_id): pred for pred in state["predictions"]}
+    st.caption("Marcadores revelados despues del cierre diario de las 11:00 hora Bogota.")
+    for match in matches:
+        st.markdown(
+            f'<div class="section-title">{_team_html(match.team_a)} vs {_team_html(match.team_b)}'
+            f'<span>{escape(match.match_id)}</span></div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            _prediction_comparison_html(match, participants, predictions),
+            unsafe_allow_html=True,
+        )
 
 
 def group_picks_view(participant: str, state: dict[str, Any]) -> None:
@@ -673,10 +709,13 @@ def _match_prediction_card(
     now: datetime,
     broadcasts: dict[str, Any],
 ) -> None:
-    locked = bool(match.kickoff_at and now >= match.kickoff_at)
+    locked = prediction_is_locked(match, now)
+    lock_at = prediction_lock_at(match)
     caption = match.kickoff_at.strftime("%Y-%m-%d %H:%M") if match.kickoff_at else "Horario por definir"
     status = "Cerrado" if locked else "Abierto"
-    just_saved = st.session_state.pop("last_saved_prediction", None) == match.match_id
+    just_saved = st.session_state.get("last_saved_prediction") == match.match_id
+    if just_saved:
+        st.session_state.pop("last_saved_prediction", None)
     is_saved = bool(
         pred
         and pred.goals_a_pred is not None
@@ -691,7 +730,9 @@ def _match_prediction_card(
     )
     card_header_html = (
         '<div class="match-card-top">'
-        f'<div><span class="match-id">{escape(match.match_id)}</span><div class="match-time">{escape(caption)}</div></div>'
+        f'<div><span class="match-id">{escape(match.match_id)}</span>'
+        f'<div class="match-time">{escape(caption)}</div>'
+        f'<div class="match-lock-time">Cierre: {escape(lock_at.strftime("%H:%M") if lock_at else "Por definir")}</div></div>'
         f"{badges_html}"
         "</div>"
     )
@@ -975,6 +1016,40 @@ def _standings_results_section(
     st.markdown(f'<div class="section-title">{escape(title)} <span>{len(rows)}</span></div>', unsafe_allow_html=True)
     for result in rows:
         st.markdown(_compact_result_html(result), unsafe_allow_html=True)
+
+
+def _prediction_comparison_html(
+    match: MatchResult,
+    participants: list[str],
+    predictions: dict[tuple[str, str], Any],
+) -> str:
+    rows = ""
+    for participant in participants:
+        prediction = predictions.get((participant, match.match_id))
+        has_prediction = bool(
+            prediction
+            and prediction.goals_a_pred is not None
+            and prediction.goals_b_pred is not None
+        )
+        score = (
+            f"{prediction.goals_a_pred} - {prediction.goals_b_pred}"
+            if has_prediction
+            else "Sin prediccion"
+        )
+        status_class = "prediction-available" if has_prediction else "prediction-missing"
+        rows += (
+            '<div class="shared-prediction-row">'
+            f'<span class="shared-prediction-user">{escape(participant)}</span>'
+            f'<strong class="{status_class}">{escape(score)}</strong>'
+            "</div>"
+        )
+    kickoff = match.kickoff_at.strftime("%Y-%m-%d %H:%M") if match.kickoff_at else "Horario por definir"
+    return (
+        '<div class="shared-predictions-card">'
+        f'<div class="shared-predictions-meta">{escape(kickoff)}</div>'
+        f"{rows}"
+        "</div>"
+    )
 
 
 def _standings_table_html(rows: list[Any]) -> str:
@@ -1455,6 +1530,12 @@ def inject_styles() -> None:
             font-size: 0.78rem;
             margin-top: 0.16rem;
         }
+        .match-lock-time {
+            color: var(--exe-red);
+            font-size: 0.7rem;
+            font-weight: 850;
+            margin-top: 0.12rem;
+        }
         .broadcast-row {
             display: flex;
             align-items: center;
@@ -1568,6 +1649,56 @@ def inject_styles() -> None:
             color: var(--exe-muted);
             font-size: 0.72rem;
             font-weight: 750;
+        }
+        .shared-predictions-card {
+            margin-bottom: 1rem;
+            overflow: hidden;
+            border: 1px solid var(--exe-border);
+            border-radius: 8px;
+            background: var(--exe-surface);
+            box-shadow: 0 8px 18px rgba(8, 33, 66, 0.05);
+        }
+        .shared-predictions-meta {
+            padding: 0.45rem 0.7rem;
+            color: var(--exe-muted);
+            background: var(--exe-surface-soft);
+            border-bottom: 1px solid var(--exe-border);
+            font-size: 0.74rem;
+            font-weight: 800;
+        }
+        .shared-prediction-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            min-height: 42px;
+            padding: 0.48rem 0.7rem;
+            border-bottom: 1px solid var(--exe-border);
+        }
+        .shared-prediction-row:last-child {
+            border-bottom: 0;
+        }
+        .shared-prediction-user {
+            min-width: 0;
+            color: var(--exe-ink);
+            font-weight: 850;
+            overflow-wrap: anywhere;
+        }
+        .shared-prediction-row strong {
+            border-radius: 999px;
+            padding: 0.2rem 0.58rem;
+            font-size: 0.82rem;
+            font-weight: 950;
+            white-space: nowrap;
+        }
+        .prediction-available {
+            color: #ffffff;
+            background: var(--exe-blue-dark);
+        }
+        .prediction-missing {
+            color: var(--exe-muted);
+            background: var(--exe-surface-soft);
+            border: 1px solid var(--exe-border);
         }
         .standings-wrap {
             width: 100%;
@@ -1810,6 +1941,10 @@ def inject_styles() -> None:
                 color: #f7fbff;
             }
             .compact-result strong {
+                background: #1d4ed8;
+                color: #ffffff;
+            }
+            .prediction-available {
                 background: #1d4ed8;
                 color: #ffffff;
             }
