@@ -4,9 +4,6 @@ on:
   workflow_dispatch:
   repository_dispatch:
     types: [daily-prediction-reminder]
-  schedule:
-    # 08:05 America/Bogota = 13:05 UTC. Colombia does not use daylight saving time.
-    - cron: "5 13 * * *"
 
 concurrency:
   group: daily-prediction-reminder

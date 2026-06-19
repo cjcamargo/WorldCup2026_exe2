@@ -232,7 +232,7 @@ El workflow:
 .github/workflows/daily-prediction-reminder.yml
 ```
 
-se ejecuta todos los dias a las **8:05 a. m. hora Bogota** (`13:05 UTC`). Envia un correo individual a los destinatarios configurados en `config/recordatorios.json` con:
+es ejecutado por un cron externo todos los dias a las **8:05 a. m. hora Bogota** (`13:05 UTC`). Envia un correo individual a los destinatarios configurados en `config/recordatorios.json` con:
 
 - Partidos del dia.
 - Horarios en Bogota.
@@ -240,7 +240,36 @@ se ejecuta todos los dias a las **8:05 a. m. hora Bogota** (`13:05 UTC`). Envia 
 - Recordatorio del cierre de las 11:00 a. m.
 - Enlace directo a la app.
 
-Tambien acepta `repository_dispatch` con tipo `daily-prediction-reminder` para usar un cron externo como respaldo.
+El workflow no usa `schedule` de GitHub, para evitar retrasos, omisiones o envios duplicados. El cron externo debe invocar:
+
+```text
+POST https://api.github.com/repos/cjcamargo/WorldCup2026_exe2/dispatches
+```
+
+Headers:
+
+```text
+Accept: application/vnd.github+json
+Authorization: Bearer TU_GITHUB_TOKEN
+X-GitHub-Api-Version: 2022-11-28
+Content-Type: application/json
+```
+
+Body:
+
+```json
+{
+  "event_type": "daily-prediction-reminder"
+}
+```
+
+Configura el cron externo en zona horaria `America/Bogota` a las `08:05`, o en UTC con expresion:
+
+```text
+5 13 * * *
+```
+
+Usa un fine-grained personal access token limitado solamente al repositorio `WorldCup2026_exe2`. El token debe guardarse como secreto en el proveedor del cron y nunca en el repositorio.
 
 Tambien puede ejecutarse manualmente:
 
