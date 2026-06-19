@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "send_when_no_matches": true,
+  "to": [
+    "aljobaca@gmail.com",
+    "16klos@gmail.com",
+    "Oscarcantillo2@gmail.com",
+    "eduardingeniero1998@gmail.com",
+    "carlosjeyson10@gmail.com"
+  ],
+  "from": "cjcamargo12@gmail.com",
+  "app_url": "https://worldcup2026exe2.streamlit.app/",
+  "smtp_host": "smtp.gmail.com",
+  "smtp_port": 587,
+  "smtp_user_env": "POLLA_SMTP_USER",
+  "smtp_password_env": "POLLA_SMTP_PASSWORD"
+}

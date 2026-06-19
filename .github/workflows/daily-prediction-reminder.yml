@@ -1,0 +1,36 @@
+name: Daily Prediction Reminder
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [daily-prediction-reminder]
+  schedule:
+    # 08:05 America/Bogota = 13:05 UTC. Colombia does not use daylight saving time.
+    - cron: "5 13 * * *"
+
+concurrency:
+  group: daily-prediction-reminder
+  cancel-in-progress: false
+
+jobs:
+  send-reminder:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Send daily reminder
+        env:
+          POLLA_SMTP_USER: ${{ secrets.POLLA_SMTP_USER }}
+          POLLA_SMTP_PASSWORD: ${{ secrets.POLLA_SMTP_PASSWORD }}
+        run: python scripts/send_daily_reminder.py

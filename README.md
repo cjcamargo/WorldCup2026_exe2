@@ -224,6 +224,37 @@ GitHub > Actions > Update Polla Backend > Run workflow
 
 El workflow `schedule-canary.yml` permite comprobar si GitHub esta disparando tareas programadas. Los cron de GitHub pueden retrasarse o saltarse; para mayor confiabilidad se recomienda mantener un cron externo que invoque `repository_dispatch`.
 
+### Recordatorio diario de predicciones
+
+El workflow:
+
+```text
+.github/workflows/daily-prediction-reminder.yml
+```
+
+se ejecuta todos los dias a las **8:05 a. m. hora Bogota** (`13:05 UTC`). Envia un correo individual a los destinatarios configurados en `config/recordatorios.json` con:
+
+- Partidos del dia.
+- Horarios en Bogota.
+- Grupo y canales de television.
+- Recordatorio del cierre de las 11:00 a. m.
+- Enlace directo a la app.
+
+Tambien acepta `repository_dispatch` con tipo `daily-prediction-reminder` para usar un cron externo como respaldo.
+
+Tambien puede ejecutarse manualmente:
+
+```text
+GitHub > Actions > Daily Prediction Reminder > Run workflow
+```
+
+Para probarlo localmente sin enviar:
+
+```powershell
+python scripts/send_daily_reminder.py --dry-run
+python scripts/send_daily_reminder.py --dry-run --date 2026-06-19
+```
+
 ## Fuentes de datos
 
 ### Resultados
@@ -284,6 +315,8 @@ config/calendario_partidos.json      Calendario en hora Bogota
 config/resultados.json               Fuentes y ventanas de consulta
 config/televisacion.json             Canales por partido
 config/puntajes.json                 Reglas de puntuacion
+config/recordatorios.json            Destinatarios del correo diario
+scripts/send_daily_reminder.py        Recordatorio de partidos
 ```
 
 ## Pruebas

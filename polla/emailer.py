@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import os
 import smtplib
+from datetime import date
 from email.message import EmailMessage
 
-from .models import AuditChange
+from .models import AuditChange, MatchResult
 
 
 def build_group_join_request_email(participant: str, group_name: str, invite_code: str, requested_at: str, cfg: dict) -> EmailMessage:
@@ -49,6 +50,50 @@ def build_changes_email(changes: list[AuditChange], cfg: dict) -> EmailMessage:
             f"   Motivo: {change.reason or ''}",
             "",
         ])
+    msg.set_content("\n".join(lines))
+    return msg
+
+
+def build_daily_reminder_email(
+    recipient: str,
+    target_date: date,
+    matches: list[MatchResult],
+    broadcasts: dict[str, list[str]],
+    cfg: dict,
+) -> EmailMessage:
+    msg = EmailMessage()
+    msg["Subject"] = f"Polla Mundialista: partidos de hoy {target_date.isoformat()}"
+    msg["From"] = cfg["from"]
+    msg["To"] = recipient
+    lines = [
+        "Hola,",
+        "",
+        f"Estos son los partidos programados para hoy, {target_date.isoformat()}, en hora Bogota:",
+        "",
+    ]
+    if matches:
+        for match in matches:
+            kickoff = match.kickoff_at.strftime("%H:%M") if match.kickoff_at else "Horario por definir"
+            channels = ", ".join(broadcasts.get(match.match_id, [])) or "Televisacion por confirmar"
+            lines.extend([
+                f"- {kickoff} | {match.team_a} vs {match.team_b}",
+                f"  Grupo: {match.phase or 'Sin fase'}",
+                f"  TV: {channels}",
+            ])
+        lines.extend([
+            "",
+            "Recuerda cargar tus predicciones antes de las 11:00 a. m. hora Bogota.",
+            "Si un partido comienza antes de las 11:00 a. m., su prediccion cierra al kickoff.",
+        ])
+    else:
+        lines.append("Hoy no hay partidos programados en el calendario de la polla.")
+    lines.extend([
+        "",
+        "Ingresa a la app:",
+        cfg["app_url"],
+        "",
+        "Polla Mundialista Exe2",
+    ])
     msg.set_content("\n".join(lines))
     return msg
 
