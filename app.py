@@ -393,6 +393,7 @@ def ranking_view(state: dict[str, Any], group_id: str) -> None:
     if not ranking:
         st.info("Todavia no hay puntos calculados.")
         return
+    predicted_counts = _predicted_match_counts(state["predictions"])
     st.markdown('<div class="section-title">Tabla de posiciones</div>', unsafe_allow_html=True)
     for idx, row in enumerate(ranking, start=1):
         raw_rank = row.get("rank") or idx
@@ -401,7 +402,11 @@ def ranking_view(state: dict[str, Any], group_id: str) -> None:
         except (TypeError, ValueError):
             rank_num = idx
         participant = escape(str(row.get("participant", "")))
-        points = escape(str(row.get("points", 0)))
+        participant_key = str(row.get("participant", ""))
+        points_value = int(row.get("points", 0) or 0)
+        points = escape(str(points_value))
+        predicted = predicted_counts.get(participant_key, 0)
+        points_per_prediction = points_value / predicted if predicted else 0.0
         medal = {1: "1", 2: "2", 3: "3"}.get(rank_num, str(raw_rank))
         st.markdown(
             f"""
@@ -410,7 +415,10 @@ def ranking_view(state: dict[str, Any], group_id: str) -> None:
                 <span class="rank-medal">{medal}</span>
                 <span class="rank-name">{participant}</span>
               </div>
-              <div class="rank-points"><strong>{points}</strong><span>pts</span></div>
+              <div class="rank-stats">
+                <div class="rank-points"><strong>{points}</strong><span>pts</span></div>
+                <div class="rank-ratio"><span>Pts / partido</span><strong>{points_per_prediction:.2f}</strong></div>
+              </div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -911,6 +919,18 @@ def _score_rows_by_group(state: dict[str, Any]) -> tuple[list[dict[str, Any]], l
         for row in detail:
             detail_rows.append({"group_id": group.group_id, **row})
     return ranking_rows, detail_rows
+
+
+def _predicted_match_counts(predictions: list[Any]) -> dict[str, int]:
+    match_ids_by_participant: dict[str, set[str]] = defaultdict(set)
+    for prediction in predictions:
+        if prediction.goals_a_pred is None or prediction.goals_b_pred is None:
+            continue
+        match_ids_by_participant[prediction.participant].add(prediction.match_id)
+    return {
+        participant: len(match_ids)
+        for participant, match_ids in match_ids_by_participant.items()
+    }
 
 
 def _team_html(team: str) -> str:
@@ -1797,6 +1817,12 @@ def inject_styles() -> None:
             color: var(--exe-ink);
             font-weight: 900;
         }
+        .rank-stats {
+            display: grid;
+            grid-template-columns: auto minmax(84px, auto);
+            align-items: center;
+            gap: 0.85rem;
+        }
         .rank-points {
             display: inline-flex;
             align-items: baseline;
@@ -1806,6 +1832,25 @@ def inject_styles() -> None:
         .rank-points strong {
             color: var(--exe-blue-dark);
             font-size: 1.35rem;
+            font-weight: 950;
+        }
+        .rank-ratio {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.08rem;
+            padding-left: 0.85rem;
+            border-left: 1px solid var(--exe-border);
+        }
+        .rank-ratio span {
+            color: var(--exe-muted);
+            font-size: 0.68rem;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+        .rank-ratio strong {
+            color: var(--exe-ink);
+            font-size: 1rem;
             font-weight: 950;
         }
         .detail-card {
@@ -1943,6 +1988,7 @@ def inject_styles() -> None:
             .ranking-row.rank-2,
             .ranking-row.rank-3 { background: linear-gradient(135deg, rgba(17, 85, 217, 0.16), var(--exe-surface) 74%); }
             .rank-points strong,
+            .rank-ratio strong,
             .detail-score-grid strong,
             .standing-points,
             .score-separator {
@@ -2027,6 +2073,22 @@ def inject_styles() -> None:
             }
             .points-pill { margin-left: 0; }
             .detail-score-grid { grid-template-columns: 1fr; }
+            .ranking-row {
+                gap: 0.55rem;
+            }
+            .rank-left {
+                gap: 0.45rem;
+            }
+            .rank-stats {
+                gap: 0.45rem;
+            }
+            .rank-ratio {
+                min-width: 72px;
+                padding-left: 0.45rem;
+            }
+            .rank-ratio span {
+                font-size: 0.6rem;
+            }
             .compact-result {
                 grid-template-columns: auto minmax(0, 1fr) auto;
             }
