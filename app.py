@@ -499,8 +499,23 @@ def detail_view(state: dict[str, Any], group_id: str) -> None:
         st.info("Todavia no hay detalle de puntos.")
         return
     participants = sorted({str(row.get("participant", "")) for row in detail if row.get("participant")})
-    selected = st.selectbox("Participante", ["Todos"] + participants, key="detail_participant")
-    rows = [row for row in detail if selected == "Todos" or row.get("participant") == selected]
+    filter_participant, filter_date = st.columns(2)
+    selected = filter_participant.selectbox("Participante", ["Todos"] + participants, key="detail_participant")
+    all_dates = filter_date.checkbox("Todas las fechas", value=False, key="detail_all_dates")
+    selected_date = None
+    date_options = _date_filter_options(state["matches"])
+    if not all_dates:
+        selected_date = filter_date.date_input(
+            "Fecha",
+            value=_default_filter_date(date_options),
+            min_value=min(date_options) if date_options else None,
+            max_value=max(date_options) if date_options else None,
+            key="detail_date_filter",
+        )
+    rows = _filter_detail_rows(detail, state["matches"], selected, selected_date)
+    if not rows:
+        st.info("No hay detalle de puntos para esos filtros.")
+        return
     st.markdown(f'<div class="section-title">Detalle de puntos <span>{len(rows)}</span></div>', unsafe_allow_html=True)
     for row in rows:
         participant = escape(str(row.get("participant", "")))
@@ -985,6 +1000,37 @@ def _matches_date(match: MatchResult, selected_date: date | None, include_before
 
 def _date_filter_options(matches: list[MatchResult]) -> list[date]:
     return sorted({match.kickoff_at.date() for match in matches if match.kickoff_at})
+
+
+def _filter_detail_rows(
+    detail: list[dict[str, Any]],
+    matches: list[MatchResult],
+    participant: str,
+    selected_date: date | None,
+) -> list[dict[str, Any]]:
+    matches_by_id = {match.match_id: match for match in matches}
+    rows = []
+    for row in detail:
+        if participant != "Todos" and row.get("participant") != participant:
+            continue
+        match = matches_by_id.get(str(row.get("match_id", "")))
+        if selected_date is not None and (
+            not match
+            or not match.kickoff_at
+            or match.kickoff_at.date() != selected_date
+        ):
+            continue
+        rows.append(row)
+    return sorted(
+        rows,
+        key=lambda row: (
+            matches_by_id.get(str(row.get("match_id", ""))).kickoff_at
+            if matches_by_id.get(str(row.get("match_id", "")))
+            and matches_by_id[str(row.get("match_id", ""))].kickoff_at
+            else datetime.max.replace(tzinfo=BOGOTA),
+            str(row.get("participant", "")),
+        ),
+    )
 
 
 def _default_filter_date(options: list[date]) -> date:
