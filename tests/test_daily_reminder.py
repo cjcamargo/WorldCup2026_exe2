@@ -32,5 +32,5 @@ def test_daily_reminder_contains_matches_deadline_channels_and_app_link():
     assert message["To"] == "player@example.com"
     assert "14:00 | Colombia vs Japan" in body
     assert "Caracol TV, DSports" in body
-    assert "12:00 m o kickoff + 2 minutos" in body
+    assert "primer kickoff + 1 minuto o 2:00 p. m." in body
     assert "https://worldcup2026exe2.streamlit.app/" in body

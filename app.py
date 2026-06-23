@@ -295,7 +295,7 @@ def match_predictions_view(participant: str, state: dict[str, Any]) -> None:
     selected_matches = _filter_matches(state["matches"], selected_phase, selected_date)
     participant_predictions = [pred for pred in state["predictions"] if pred.participant == participant]
     saved_count = len({pred.match_id for pred in participant_predictions if pred.goals_a_pred is not None and pred.goals_b_pred is not None})
-    open_count = sum(1 for match in state["matches"] if not prediction_is_locked(match, now))
+    open_count = sum(1 for match in state["matches"] if not prediction_is_locked(match, now, state["matches"]))
     locked_count = len(state["matches"]) - open_count
 
     metric_cols = st.columns(3)
@@ -306,7 +306,7 @@ def match_predictions_view(participant: str, state: dict[str, Any]) -> None:
     grid = st.columns(2)
     for idx, match in enumerate(selected_matches):
         with grid[idx % 2]:
-            _match_prediction_card(store, participant, match, predictions.get((participant, match.match_id)), now, state["broadcasts"])
+            _match_prediction_card(store, participant, match, predictions.get((participant, match.match_id)), now, state["broadcasts"], state["matches"])
 
 
 def predictions_view(state: dict[str, Any], group_id: str) -> None:
@@ -319,17 +319,17 @@ def predictions_view(state: dict[str, Any], group_id: str) -> None:
         key="shared_predictions_date",
     )
     now = now_bogota()
-    if not predictions_visible_for_date(selected_date, now):
-        st.info(f"Las predicciones del {selected_date.isoformat()} estaran visibles desde las 12:00 m hora Bogota.")
+    if not predictions_visible_for_date(selected_date, now, state["matches"]):
+        st.info(f"Las predicciones del {selected_date.isoformat()} estaran visibles desde el cierre diario: primer kickoff + 1 minuto o 2:00 p. m., lo que ocurra primero.")
         return
 
-    matches = [match for match in _filter_matches(state["matches"], "Todos", selected_date) if prediction_is_locked(match, now)]
+    matches = [match for match in _filter_matches(state["matches"], "Todos", selected_date) if prediction_is_locked(match, now, state["matches"])]
     if not matches:
         st.info("Todavia no hay partidos bloqueados para esta fecha.")
         return
     participants = sorted(_active_participants_for_group(group_id, state))
     predictions = {(pred.participant, pred.match_id): pred for pred in state["predictions"]}
-    st.caption("Marcadores revelados cuando cada partido queda bloqueado: 12:00 m o kickoff + 2 minutos, lo que ocurra de ultimo.")
+    st.caption("Marcadores revelados desde el cierre diario: primer kickoff + 1 minuto o 2:00 p. m., lo que ocurra primero.")
     for match in matches:
         st.markdown(
             f'<div class="section-title">{_team_html(match.team_a)} vs {_team_html(match.team_b)}'
@@ -731,9 +731,10 @@ def _match_prediction_card(
     pred: Any,
     now: datetime,
     broadcasts: dict[str, Any],
+    schedule: list[MatchResult],
 ) -> None:
-    locked = prediction_is_locked(match, now)
-    lock_at = prediction_lock_at(match)
+    locked = prediction_is_locked(match, now, schedule)
+    lock_at = prediction_lock_at(match, schedule)
     caption = match.kickoff_at.strftime("%Y-%m-%d %H:%M") if match.kickoff_at else "Horario por definir"
     status = "Cerrado" if locked else "Abierto"
     just_saved = st.session_state.get("last_saved_prediction") == match.match_id

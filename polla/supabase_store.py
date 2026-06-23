@@ -242,8 +242,9 @@ class SupabaseStore:
         ]
 
     def save_prediction(self, participant: str, match: MatchResult, goals_a: int | None, goals_b: int | None, at: datetime) -> None:
-        if prediction_is_locked(match, at):
-            lock_at = prediction_lock_at(match)
+        schedule = self.matches()
+        if prediction_is_locked(match, at, schedule):
+            lock_at = prediction_lock_at(match, schedule)
             lock_text = lock_at.strftime("%Y-%m-%d %H:%M") if lock_at else "el cierre"
             raise ValueError(f"Las predicciones de este partido cerraron el {lock_text} hora Bogota.")
         values = {

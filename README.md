@@ -13,7 +13,7 @@ La interfaz principal ya no depende de archivos Excel. Las predicciones nuevas s
 - Usuarios globalmente unicos.
 - Cambio de PIN desde `Mi cuenta`.
 - Predicciones de marcadores con indicador persistente `Guardado`.
-- Cierre de predicciones a las 12:00 m o kickoff + 2 minutos, lo que ocurra de ultimo.
+- Cierre diario de predicciones: primer kickoff del dia + 1 minuto o 2:00 p. m., lo que ocurra primero.
 - Predicciones de todos los integrantes visibles solo cuando el partido ya esta bloqueado.
 - Top 3 por grupo y campeon, subcampeon y tercer puesto.
 - Ranking independiente para cada grupo de polla.
@@ -236,7 +236,7 @@ es ejecutado por un cron externo todos los dias a las **8:05 a. m. hora Bogota**
 - Partidos del dia.
 - Horarios en Bogota.
 - Grupo y canales de television.
-- Recordatorio del cierre: 12:00 m o kickoff + 2 minutos, lo que ocurra de ultimo.
+- Recordatorio del cierre diario: primer kickoff + 1 minuto o 2:00 p. m., lo que ocurra primero.
 - Enlace directo a la app.
 
 El workflow no usa `schedule` de GitHub, para evitar retrasos, omisiones o envios duplicados. El cron externo debe invocar:

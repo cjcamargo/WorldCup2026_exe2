@@ -68,7 +68,7 @@ def apply_deadline_policy(
 ) -> tuple[list[Prediction], list[AuditChange]]:
     lock_by_match = {}
     for match in schedule:
-        lock_at = prediction_lock_at(match)
+        lock_at = prediction_lock_at(match, schedule)
         if lock_at:
             lock_by_match[match.match_id] = lock_at
     late_keys: set[tuple[str, str]] = set()
