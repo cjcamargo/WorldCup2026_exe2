@@ -8,6 +8,7 @@ from typing import Any
 
 from .config import load_json, save_json
 from .models import AuditChange, MatchResult, Prediction
+from .prediction_rules import prediction_lock_at
 
 
 AUDIT_FIELDS = ["goals_a_pred", "goals_b_pred", "winner_pred"]
@@ -65,12 +66,16 @@ def apply_deadline_policy(
     schedule: list[MatchResult],
     at: datetime,
 ) -> tuple[list[Prediction], list[AuditChange]]:
-    kickoff_by_match = {match.match_id: match.kickoff_at for match in schedule if match.kickoff_at}
+    lock_by_match = {}
+    for match in schedule:
+        lock_at = prediction_lock_at(match)
+        if lock_at:
+            lock_by_match[match.match_id] = lock_at
     late_keys: set[tuple[str, str]] = set()
     updated_changes: list[AuditChange] = []
     for change in changes:
-        kickoff = kickoff_by_match.get(change.match_id)
-        if kickoff and at >= kickoff:
+        lock_at = lock_by_match.get(change.match_id)
+        if lock_at and at >= lock_at:
             late_keys.add((change.participant, change.match_id))
             updated_changes.append(AuditChange(
                 detected_at=change.detected_at,
@@ -80,7 +85,7 @@ def apply_deadline_policy(
                 old_value=change.old_value,
                 new_value=change.new_value,
                 status="invalid",
-                reason=f"Cambio detectado despues del cierre: {kickoff.isoformat()}",
+                reason=f"Cambio detectado despues del cierre: {lock_at.isoformat()}",
             ))
         else:
             updated_changes.append(change)

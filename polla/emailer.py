@@ -82,8 +82,7 @@ def build_daily_reminder_email(
             ])
         lines.extend([
             "",
-            "Recuerda cargar tus predicciones antes de las 11:00 a. m. hora Bogota.",
-            "Si un partido comienza antes de las 11:00 a. m., su prediccion cierra al kickoff.",
+            "Recuerda cargar tus predicciones antes del cierre: 12:00 m o kickoff + 2 minutos, lo que ocurra de ultimo.",
         ])
     else:
         lines.append("Hoy no hay partidos programados en el calendario de la polla.")

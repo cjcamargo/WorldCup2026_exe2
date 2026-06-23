@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 
 from .models import MatchResult
 from .timeutils import BOGOTA, as_bogota
 
 
-DAILY_PREDICTION_CUTOFF = time(hour=11)
+DAILY_PREDICTION_CUTOFF = time(hour=12)
+KICKOFF_GRACE_PERIOD = timedelta(minutes=2)
 
 
 def prediction_lock_at(match: MatchResult) -> datetime | None:
@@ -14,7 +15,8 @@ def prediction_lock_at(match: MatchResult) -> datetime | None:
     if kickoff is None:
         return None
     daily_cutoff = datetime.combine(kickoff.date(), DAILY_PREDICTION_CUTOFF, tzinfo=BOGOTA)
-    return min(kickoff, daily_cutoff)
+    kickoff_cutoff = kickoff + KICKOFF_GRACE_PERIOD
+    return max(daily_cutoff, kickoff_cutoff)
 
 
 def prediction_is_locked(match: MatchResult, at: datetime) -> bool:

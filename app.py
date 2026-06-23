@@ -320,16 +320,16 @@ def predictions_view(state: dict[str, Any], group_id: str) -> None:
     )
     now = now_bogota()
     if not predictions_visible_for_date(selected_date, now):
-        st.info(f"Las predicciones del {selected_date.isoformat()} estaran visibles desde las 11:00 hora Bogota.")
+        st.info(f"Las predicciones del {selected_date.isoformat()} estaran visibles desde las 12:00 m hora Bogota.")
         return
 
-    matches = _filter_matches(state["matches"], "Todos", selected_date)
+    matches = [match for match in _filter_matches(state["matches"], "Todos", selected_date) if prediction_is_locked(match, now)]
     if not matches:
-        st.info("No hay partidos programados para esta fecha.")
+        st.info("Todavia no hay partidos bloqueados para esta fecha.")
         return
     participants = sorted(_active_participants_for_group(group_id, state))
     predictions = {(pred.participant, pred.match_id): pred for pred in state["predictions"]}
-    st.caption("Marcadores revelados despues del cierre diario de las 11:00 hora Bogota.")
+    st.caption("Marcadores revelados cuando cada partido queda bloqueado: 12:00 m o kickoff + 2 minutos, lo que ocurra de ultimo.")
     for match in matches:
         st.markdown(
             f'<div class="section-title">{_team_html(match.team_a)} vs {_team_html(match.team_b)}'
