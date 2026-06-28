@@ -11,11 +11,11 @@ from .models import AuditChange, MatchResult, Prediction
 from .prediction_rules import prediction_lock_at
 
 
-AUDIT_FIELDS = ["goals_a_pred", "goals_b_pred", "winner_pred"]
+AUDIT_FIELDS = ["goals_a_pred", "goals_b_pred", "winner_pred", "qualified_team_pred"]
 
 
 def prediction_key(pred: Prediction) -> str:
-    return f"{pred.participant}|{pred.match_id}|{pred.team_a}|{pred.team_b}"
+    return f"{pred.group_id or ''}|{pred.participant}|{pred.match_id}|{pred.team_a}|{pred.team_b}"
 
 
 def predictions_to_snapshot(predictions: list[Prediction]) -> dict[str, Any]:
@@ -107,6 +107,8 @@ def apply_deadline_policy(
                 source_row=pred.source_row,
                 valid=False,
                 invalid_reason="Cambio tardio detectado por auditoria",
+                group_id=pred.group_id,
+                qualified_team_pred=pred.qualified_team_pred,
             ))
         else:
             guarded.append(pred)

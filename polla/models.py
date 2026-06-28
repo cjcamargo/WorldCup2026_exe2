@@ -19,6 +19,8 @@ class Prediction:
     source_row: int | None = None
     valid: bool = True
     invalid_reason: str | None = None
+    group_id: str | None = None
+    qualified_team_pred: str | None = None
 
 
 @dataclass(frozen=True)
@@ -27,6 +29,7 @@ class FinalPicks:
     champion: str | None = None
     runner_up: str | None = None
     third_place: str | None = None
+    group_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -36,6 +39,7 @@ class GroupPick:
     first: str | None = None
     second: str | None = None
     third: str | None = None
+    group_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -53,6 +57,7 @@ class PollaGroup:
     invite_code: str
     created_by: str
     active: bool = True
+    competition_mode: str = "full"
 
 
 @dataclass(frozen=True)
@@ -76,6 +81,12 @@ class MatchResult:
     source: str | None = None
     source_url: str | None = None
     confirmed: bool = False
+    final_goals_a: int | None = None
+    final_goals_b: int | None = None
+    penalties_a: int | None = None
+    penalties_b: int | None = None
+    qualified_team: str | None = None
+    decision: str | None = None
 
 
 @dataclass(frozen=True)
@@ -88,6 +99,7 @@ class AuditChange:
     new_value: Any
     status: str
     reason: str | None = None
+    group_id: str | None = None
 
 
 @dataclass

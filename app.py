@@ -12,6 +12,7 @@ import streamlit as st
 from polla.config import config_path, load_json
 from polla.emailer import build_group_join_request_email, send_messages
 from polla.models import FinalPicks, GroupPick, MatchResult
+from polla.knockout import is_knockout_phase, is_match_ready, knockout_teams, matches_for_mode
 from polla.prediction_rules import prediction_is_locked, prediction_lock_at, predictions_visible_for_date
 from polla.scoring import score_all
 from polla.standings import calculate_group_standings, payload_to_standings
@@ -134,29 +135,37 @@ def main() -> None:
 
     _group_selector(participant, state, active_group)
 
-    tabs = ["Mis marcadores", "Predicciones", "Posiciones", "Ranking", "Top 3 grupos", "Finales", "Detalle", "Mi cuenta"]
+    if active_group.competition_mode == "knockout":
+        tabs = ["Mis marcadores", "Predicciones", "Resultados", "Ranking", "Finales", "Detalle", "Mi cuenta"]
+    elif active_group.competition_mode == "group_stage":
+        tabs = ["Mis marcadores", "Predicciones", "Posiciones", "Ranking", "Top 3 grupos", "Detalle", "Mi cuenta"]
+    else:
+        tabs = ["Mis marcadores", "Predicciones", "Posiciones", "Ranking", "Top 3 grupos", "Finales", "Detalle", "Mi cuenta"]
     if role == "admin" or _is_group_admin(participant, active_group.group_id, state):
         tabs.append("Admin")
     rendered_tabs = st.tabs(tabs)
-    with rendered_tabs[0]:
-        match_predictions_view(participant, state)
-    with rendered_tabs[1]:
-        predictions_view(state, active_group.group_id)
-    with rendered_tabs[2]:
-        standings_view(state)
-    with rendered_tabs[3]:
-        ranking_view(state, active_group.group_id)
-    with rendered_tabs[4]:
-        group_picks_view(participant, state)
-    with rendered_tabs[5]:
-        final_picks_view(participant, state)
-    with rendered_tabs[6]:
-        detail_view(state, active_group.group_id)
-    with rendered_tabs[7]:
-        account_view(participant, state, active_group)
-    if role == "admin" or _is_group_admin(participant, active_group.group_id, state):
-        with rendered_tabs[8]:
-            admin_view(participant, state, active_group)
+    for tab, name in zip(rendered_tabs, tabs):
+        with tab:
+            if name == "Mis marcadores":
+                match_predictions_view(participant, state, active_group)
+            elif name == "Predicciones":
+                predictions_view(state, active_group)
+            elif name == "Posiciones":
+                standings_view(state)
+            elif name == "Resultados":
+                knockout_results_view(state)
+            elif name == "Ranking":
+                ranking_view(state, active_group.group_id)
+            elif name == "Top 3 grupos":
+                group_picks_view(participant, state, active_group)
+            elif name == "Finales":
+                final_picks_view(participant, state, active_group)
+            elif name == "Detalle":
+                detail_view(state, active_group.group_id)
+            elif name == "Mi cuenta":
+                account_view(participant, state, active_group)
+            elif name == "Admin":
+                admin_view(participant, state, active_group)
 
 
 def render_header(participant: str | None = None, active_group: Any | None = None) -> None:
@@ -287,16 +296,24 @@ def _join_group_new_user(store: SupabaseStore, state: dict[str, Any]) -> None:
     else:
         st.success("Solicitud enviada. El admin del grupo debe aprobarte.")
 
-def match_predictions_view(participant: str, state: dict[str, Any]) -> None:
+def match_predictions_view(participant: str, state: dict[str, Any], active_group: Any) -> None:
     store = get_store()
     now = now_bogota()
-    predictions = {(pred.participant, pred.match_id): pred for pred in state["predictions"]}
-    selected_phase, selected_date = _group_date_filters(state["matches"], "match")
-    selected_matches = _filter_matches(state["matches"], selected_phase, selected_date)
-    participant_predictions = [pred for pred in state["predictions"] if pred.participant == participant]
+    group_matches = matches_for_mode(state["matches"], active_group.competition_mode)
+    predictions = {
+        (pred.participant, pred.match_id): pred
+        for pred in state["predictions"]
+        if pred.group_id == active_group.group_id
+    }
+    selected_phase, selected_date = _group_date_filters(group_matches, f"match_{active_group.group_id}")
+    selected_matches = _filter_matches(group_matches, selected_phase, selected_date)
+    participant_predictions = [
+        pred for pred in state["predictions"]
+        if pred.participant == participant and pred.group_id == active_group.group_id
+    ]
     saved_count = len({pred.match_id for pred in participant_predictions if pred.goals_a_pred is not None and pred.goals_b_pred is not None})
-    open_count = sum(1 for match in state["matches"] if not prediction_is_locked(match, now, state["matches"]))
-    locked_count = len(state["matches"]) - open_count
+    open_count = sum(1 for match in group_matches if is_match_ready(match) and not prediction_is_locked(match, now, group_matches))
+    locked_count = sum(1 for match in group_matches if is_match_ready(match) and prediction_is_locked(match, now, group_matches))
 
     metric_cols = st.columns(3)
     _metric_card(metric_cols[0], "Marcadores guardados", saved_count, "score")
@@ -306,29 +323,37 @@ def match_predictions_view(participant: str, state: dict[str, Any]) -> None:
     grid = st.columns(2)
     for idx, match in enumerate(selected_matches):
         with grid[idx % 2]:
-            _match_prediction_card(store, participant, match, predictions.get((participant, match.match_id)), now, state["broadcasts"], state["matches"])
+            _match_prediction_card(
+                store, active_group.group_id, participant, match,
+                predictions.get((participant, match.match_id)), now, state["broadcasts"], group_matches,
+            )
 
 
-def predictions_view(state: dict[str, Any], group_id: str) -> None:
-    date_options = _date_filter_options(state["matches"])
+def predictions_view(state: dict[str, Any], active_group: Any) -> None:
+    group_matches = matches_for_mode(state["matches"], active_group.competition_mode)
+    date_options = _date_filter_options(group_matches)
     selected_date = st.date_input(
         "Fecha de predicciones",
         value=_default_filter_date(date_options),
         min_value=min(date_options) if date_options else None,
         max_value=max(date_options) if date_options else None,
-        key="shared_predictions_date",
+        key=f"shared_predictions_date_{active_group.group_id}",
     )
     now = now_bogota()
-    if not predictions_visible_for_date(selected_date, now, state["matches"]):
+    if not predictions_visible_for_date(selected_date, now, group_matches):
         st.info(f"Las predicciones del {selected_date.isoformat()} estaran visibles desde el cierre diario: primer kickoff + 1 minuto o 2:00 p. m., lo que ocurra primero.")
         return
 
-    matches = [match for match in _filter_matches(state["matches"], "Todos", selected_date) if prediction_is_locked(match, now, state["matches"])]
+    matches = [match for match in _filter_matches(group_matches, "Todos", selected_date) if prediction_is_locked(match, now, group_matches)]
     if not matches:
         st.info("Todavia no hay partidos bloqueados para esta fecha.")
         return
-    participants = sorted(_active_participants_for_group(group_id, state))
-    predictions = {(pred.participant, pred.match_id): pred for pred in state["predictions"]}
+    participants = sorted(_active_participants_for_group(active_group.group_id, state) - {"admin"})
+    predictions = {
+        (pred.participant, pred.match_id): pred
+        for pred in state["predictions"]
+        if pred.group_id == active_group.group_id
+    }
     st.caption("Marcadores revelados desde el cierre diario: primer kickoff + 1 minuto o 2:00 p. m., lo que ocurra primero.")
     for match in matches:
         st.markdown(
@@ -342,10 +367,14 @@ def predictions_view(state: dict[str, Any], group_id: str) -> None:
         )
 
 
-def group_picks_view(participant: str, state: dict[str, Any]) -> None:
+def group_picks_view(participant: str, state: dict[str, Any], active_group: Any) -> None:
     store = get_store()
     settings = state["settings"]
-    picks = {(pick.participant, pick.group): pick for pick in state["group_picks"]}
+    picks = {
+        (pick.participant, pick.group): pick
+        for pick in state["group_picks"]
+        if pick.group_id == active_group.group_id
+    }
     teams_by_group = _teams_by_group(state["matches"])
     for group, teams in sorted(teams_by_group.items()):
         closed = bool(settings.get(f"group_closed_{group}", False))
@@ -361,28 +390,44 @@ def group_picks_view(participant: str, state: dict[str, Any]) -> None:
             third = st.selectbox("3", third_options, index=_index(third_options, current.third), disabled=closed, key=f"{group}_third")
             submitted = st.form_submit_button("Guardar Top 3", disabled=closed)
         if submitted:
-            store.save_group_pick(GroupPick(participant, group, first or None, second or None, third or None), now_bogota())
+            store.save_group_pick(GroupPick(participant, group, first or None, second or None, third or None, active_group.group_id), now_bogota())
             load_state.clear()
             st.success("Top 3 guardado.")
             st.rerun()
 
 
-def final_picks_view(participant: str, state: dict[str, Any]) -> None:
+def final_picks_view(participant: str, state: dict[str, Any], active_group: Any) -> None:
     store = get_store()
-    closed = bool(state["settings"].get("final_picks_closed", False))
-    teams = sorted({match.team_a for match in state["matches"]} | {match.team_b for match in state["matches"]})
-    current = next((pick for pick in state["final_picks"] if pick.participant == participant), FinalPicks(participant))
+    setting_key = _final_picks_setting_key(active_group)
+    closed = bool(state["settings"].get(setting_key, False))
+    group_matches = matches_for_mode(state["matches"], active_group.competition_mode)
+    teams = knockout_teams(group_matches) if active_group.competition_mode == "knockout" else sorted(
+        {match.team_a for match in group_matches} | {match.team_b for match in group_matches}
+    )
+    current = next(
+        (pick for pick in state["final_picks"] if pick.participant == participant and pick.group_id == active_group.group_id),
+        FinalPicks(participant, group_id=active_group.group_id),
+    )
     if closed:
         st.info("Los picks finales estan cerrados por admin.")
-    with st.form("final_picks"):
-        champion = st.selectbox("Campeon", [""] + teams, index=_index([""] + teams, current.champion), disabled=closed)
+    with st.form(f"final_picks_{active_group.group_id}"):
+        champion = st.selectbox(
+            "Campeon", [""] + teams, index=_index([""] + teams, current.champion), disabled=closed,
+            key=f"{active_group.group_id}_champion",
+        )
         runner_options = [""] + [team for team in teams if team != champion]
-        runner_up = st.selectbox("Subcampeon", runner_options, index=_index(runner_options, current.runner_up), disabled=closed)
+        runner_up = st.selectbox(
+            "Subcampeon", runner_options, index=_index(runner_options, current.runner_up), disabled=closed,
+            key=f"{active_group.group_id}_runner_up",
+        )
         third_options = [""] + [team for team in teams if team not in {champion, runner_up}]
-        third_place = st.selectbox("Tercer puesto", third_options, index=_index(third_options, current.third_place), disabled=closed)
+        third_place = st.selectbox(
+            "Tercer puesto", third_options, index=_index(third_options, current.third_place), disabled=closed,
+            key=f"{active_group.group_id}_third_place",
+        )
         submitted = st.form_submit_button("Guardar finales", disabled=closed)
     if submitted:
-        store.save_final_picks(FinalPicks(participant, champion or None, runner_up or None, third_place or None), now_bogota())
+        store.save_final_picks(FinalPicks(participant, champion or None, runner_up or None, third_place or None, active_group.group_id), now_bogota())
         load_state.clear()
         st.success("Picks finales guardados.")
         st.rerun()
@@ -393,7 +438,7 @@ def ranking_view(state: dict[str, Any], group_id: str) -> None:
     if not ranking:
         st.info("Todavia no hay puntos calculados.")
         return
-    predicted_counts = _predicted_match_counts(state["predictions"])
+    predicted_counts = _predicted_match_counts(state["predictions"], group_id)
     st.markdown('<div class="section-title">Tabla de posiciones</div>', unsafe_allow_html=True)
     for idx, row in enumerate(ranking, start=1):
         raw_rank = row.get("rank") or idx
@@ -465,6 +510,30 @@ def results_view(state: dict[str, Any]) -> None:
                 """,
                 unsafe_allow_html=True,
             )
+
+
+def knockout_results_view(state: dict[str, Any]) -> None:
+    matches = matches_for_mode(state["matches"], "knockout")
+    results = {result.match_id: result for result in state["results"] if result.confirmed}
+    phases = ["Round of 32", "Round of 16", "Quarter-finals", "Semi-finals", "Third place", "Final"]
+    for phase in phases:
+        phase_matches = [match for match in matches if match.phase == phase]
+        if not phase_matches:
+            continue
+        st.markdown(f'<div class="section-title">{escape(phase)} <span>{len(phase_matches)}</span></div>', unsafe_allow_html=True)
+        for match in sorted(phase_matches, key=lambda item: item.kickoff_at or datetime.max.replace(tzinfo=BOGOTA)):
+            result = results.get(match.match_id)
+            if result:
+                st.markdown(_compact_result_html(result), unsafe_allow_html=True)
+            else:
+                kickoff = match.kickoff_at.strftime("%Y-%m-%d %H:%M") if match.kickoff_at else "Horario por definir"
+                st.markdown(
+                    '<div class="compact-result">'
+                    f'<span class="match-id">{escape(match.match_id)}</span>'
+                    f'<span>{_team_html(match.team_a)}</span><strong>vs</strong><span>{_team_html(match.team_b)}</span>'
+                    f'<small>{escape(kickoff)} - Pendiente</small></div>',
+                    unsafe_allow_html=True,
+                )
 
 
 def standings_view(state: dict[str, Any]) -> None:
@@ -660,22 +729,31 @@ def admin_view(participant: str, state: dict[str, Any], active_group: Any) -> No
         return
 
     st.subheader("Cierres manuales")
-    teams_by_group = _teams_by_group(state["matches"])
-    for group in sorted(teams_by_group):
-        key = f"group_closed_{group}"
-        new_value = st.toggle(f"Cerrar Top 3 {group}", value=bool(state["settings"].get(key, False)))
-        if new_value != bool(state["settings"].get(key, False)):
-            store.save_setting(key, new_value)
+    if active_group.competition_mode != "knockout":
+        teams_by_group = _teams_by_group(state["matches"])
+        for group in sorted(teams_by_group):
+            key = f"group_closed_{group}"
+            new_value = st.toggle(f"Cerrar Top 3 {group}", value=bool(state["settings"].get(key, False)))
+            if new_value != bool(state["settings"].get(key, False)):
+                store.save_setting(key, new_value)
+                load_state.clear()
+                st.rerun()
+    if active_group.competition_mode != "group_stage":
+        final_key = _final_picks_setting_key(active_group)
+        final_closed = st.toggle(
+            f"Cerrar campeon/subcampeon/tercero - {active_group.name}",
+            value=bool(state["settings"].get(final_key, False)),
+        )
+        if final_closed != bool(state["settings"].get(final_key, False)):
+            store.save_setting(final_key, final_closed)
             load_state.clear()
             st.rerun()
-    final_closed = st.toggle("Cerrar campeon/subcampeon/tercero", value=bool(state["settings"].get("final_picks_closed", False)))
-    if final_closed != bool(state["settings"].get("final_picks_closed", False)):
-        store.save_setting("final_picks_closed", final_closed)
-        load_state.clear()
-        st.rerun()
 
     st.subheader("Resultados finales reales")
-    teams = sorted({match.team_a for match in state["matches"]} | {match.team_b for match in state["matches"]})
+    teams = sorted({
+        team for match in state["matches"] for team in (match.team_a, match.team_b)
+        if not team.startswith(("Winner ", "Loser "))
+    })
     with st.form("actual_finals"):
         actual_champion = st.selectbox("Campeon real", [""] + teams, index=_index([""] + teams, state["settings"].get("actual_champion")))
         runner_options = [""] + [team for team in teams if team != actual_champion]
@@ -701,21 +779,35 @@ def admin_view(participant: str, state: dict[str, Any], active_group: Any) -> No
 
 
 def _score_state(state: dict[str, Any], group_id: str | None = None) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    group = next((item for item in state["groups"] if item.group_id == group_id), None)
+    if group is None:
+        return [], []
+    matches = matches_for_mode(state["matches"], group.competition_mode)
+    match_ids = {match.match_id for match in matches}
+    predictions = [
+        pred for pred in state["predictions"]
+        if pred.group_id == group_id and pred.match_id in match_ids
+    ]
+    results = [result for result in state["results"] if result.match_id in match_ids]
+    final_picks = [] if group.competition_mode == "group_stage" else [
+        pick for pick in state["final_picks"] if pick.group_id == group_id
+    ]
+    group_picks = [] if group.competition_mode == "knockout" else [
+        pick for pick in state["group_picks"] if pick.group_id == group_id
+    ]
     ranking, detail = score_all(
-        state["predictions"],
-        state["results"],
-        state["final_picks"],
+        predictions,
+        results,
+        final_picks,
         {
             "champion": state["settings"].get("actual_champion") or None,
             "runner_up": state["settings"].get("actual_runner_up") or None,
             "third_place": state["settings"].get("actual_third_place") or None,
         },
-        state["group_picks"],
-        state["matches"],
+        group_picks,
+        matches,
         state["points"],
     )
-    if not group_id:
-        return ranking, detail
     participants = _active_participants_for_group(group_id, state)
     ranking = [row for row in ranking if row.get("participant") in participants]
     for idx, row in enumerate(ranking, start=1):
@@ -726,6 +818,7 @@ def _score_state(state: dict[str, Any], group_id: str | None = None) -> tuple[li
 
 def _match_prediction_card(
     store: SupabaseStore,
+    group_id: str,
     participant: str,
     match: MatchResult,
     pred: Any,
@@ -733,10 +826,11 @@ def _match_prediction_card(
     broadcasts: dict[str, Any],
     schedule: list[MatchResult],
 ) -> None:
-    locked = prediction_is_locked(match, now, schedule)
+    ready = is_match_ready(match)
+    locked = not ready or prediction_is_locked(match, now, schedule)
     lock_at = prediction_lock_at(match, schedule)
     caption = match.kickoff_at.strftime("%Y-%m-%d %H:%M") if match.kickoff_at else "Horario por definir"
-    status = "Cerrado" if locked else "Abierto"
+    status = "Pendiente" if not ready else "Cerrado" if locked else "Abierto"
     just_saved = st.session_state.get("last_saved_prediction") == match.match_id
     if just_saved:
         st.session_state.pop("last_saved_prediction", None)
@@ -772,8 +866,8 @@ def _match_prediction_card(
     )
     with st.container(border=True):
         st.markdown(card_intro_html, unsafe_allow_html=True)
-        with st.form(f"pred_{match.match_id}"):
-            col_a, score_sep, col_b, col_save = st.columns([0.8, 0.18, 0.8, 0.75], vertical_alignment="bottom")
+        with st.form(f"pred_{group_id}_{match.match_id}"):
+            col_a, score_sep, col_b = st.columns([0.8, 0.18, 0.8], vertical_alignment="bottom")
             goals_a = col_a.number_input(
                 match.team_a,
                 min_value=0,
@@ -781,7 +875,7 @@ def _match_prediction_card(
                 value=_default_int(pred.goals_a_pred if pred else None),
                 step=1,
                 disabled=locked,
-                key=f"{match.match_id}_a",
+                key=f"{group_id}_{match.match_id}_a",
                 label_visibility="collapsed",
             )
             score_sep.markdown('<div class="score-separator">:</div>', unsafe_allow_html=True)
@@ -792,13 +886,30 @@ def _match_prediction_card(
                 value=_default_int(pred.goals_b_pred if pred else None),
                 step=1,
                 disabled=locked,
-                key=f"{match.match_id}_b",
+                key=f"{group_id}_{match.match_id}_b",
                 label_visibility="collapsed",
             )
-            submitted = col_save.form_submit_button("Guardar", disabled=locked, use_container_width=True)
+            qualified_team_pred = None
+            if is_knockout_phase(match.phase) and ready:
+                if goals_a > goals_b:
+                    qualified_team_pred = match.team_a
+                    st.caption(f"Clasifica: {match.team_a}")
+                elif goals_b > goals_a:
+                    qualified_team_pred = match.team_b
+                    st.caption(f"Clasifica: {match.team_b}")
+                else:
+                    qualifier_options = [match.team_a, match.team_b]
+                    qualified_team_pred = st.selectbox(
+                        "Quien clasifica",
+                        qualifier_options,
+                        index=_index(qualifier_options, pred.qualified_team_pred if pred else None),
+                        disabled=locked,
+                        key=f"{group_id}_{match.match_id}_qualifier",
+                    )
+            submitted = st.form_submit_button("Guardar", disabled=locked, use_container_width=True)
         if submitted:
             try:
-                store.save_prediction(participant, match, int(goals_a), int(goals_b), now)
+                store.save_prediction(group_id, participant, match, int(goals_a), int(goals_b), qualified_team_pred, now)
                 st.session_state["last_saved_prediction"] = match.match_id
                 load_state.clear()
                 st.success("Marcador guardado.")
@@ -937,9 +1048,17 @@ def _score_rows_by_group(state: dict[str, Any]) -> tuple[list[dict[str, Any]], l
     return ranking_rows, detail_rows
 
 
-def _predicted_match_counts(predictions: list[Any]) -> dict[str, int]:
+def _final_picks_setting_key(group: Any) -> str:
+    if group.competition_mode == "full" and group.invite_code == "EXE2":
+        return "final_picks_closed"
+    return f"final_picks_closed_{group.invite_code}"
+
+
+def _predicted_match_counts(predictions: list[Any], group_id: str | None = None) -> dict[str, int]:
     match_ids_by_participant: dict[str, set[str]] = defaultdict(set)
     for prediction in predictions:
+        if group_id is not None and prediction.group_id != group_id:
+            continue
         if prediction.goals_a_pred is None or prediction.goals_b_pred is None:
             continue
         match_ids_by_participant[prediction.participant].add(prediction.match_id)
@@ -1091,6 +1210,9 @@ def _prediction_comparison_html(
         if not prediction or prediction.goals_a_pred is None or prediction.goals_b_pred is None:
             continue
         score = f"{prediction.goals_a_pred} - {prediction.goals_b_pred}"
+        qualifier = prediction.qualified_team_pred or prediction.winner_pred
+        if is_knockout_phase(match.phase) and qualifier:
+            score += f" | {qualifier}"
         rows += (
             '<div class="shared-prediction-row">'
             f'<span class="shared-prediction-user">{escape(participant)}</span>'
@@ -1136,13 +1258,21 @@ def _compact_result_html(result: MatchResult) -> str:
     score = _score_text(result.goals_a_real, result.goals_b_real)
     kickoff = result.kickoff_at.strftime("%Y-%m-%d %H:%M") if result.kickoff_at else "Horario por definir"
     source = escape(result.source or "Automatico")
+    qualifier = f"Clasifica {result.qualified_team}" if result.qualified_team else source
+    extra = ""
+    if result.final_goals_a is not None and result.final_goals_b is not None and (
+        result.final_goals_a != result.goals_a_real or result.final_goals_b != result.goals_b_real
+    ):
+        extra += f" | Final {result.final_goals_a}-{result.final_goals_b}"
+    if result.penalties_a is not None and result.penalties_b is not None:
+        extra += f" | Penales {result.penalties_a}-{result.penalties_b}"
     return (
         '<div class="compact-result">'
         f'<span class="match-id">{escape(result.match_id)}</span>'
         f'<span>{_team_html(result.team_a)}</span>'
         f"<strong>{escape(score)}</strong>"
         f'<span>{_team_html(result.team_b)}</span>'
-        f'<small>{escape(kickoff)} - {source}</small>'
+        f'<small>{escape(kickoff)} - {escape(qualifier + extra)} - {source}</small>'
         "</div>"
     )
 

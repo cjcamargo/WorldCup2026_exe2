@@ -13,6 +13,7 @@ from typing import Any
 import pandas as pd
 
 from .models import MatchResult
+from .knockout import is_knockout_phase
 from .schedule import canonical_team_name, norm_text
 from .timeutils import as_bogota, now_bogota, parse_datetime
 
@@ -163,19 +164,28 @@ def update_results_from_sources(schedule: list[MatchResult], existing: list[Matc
     for match in due:
         source_match = _find_candidate(match, candidates)
         if source_match and source_match.confirmed:
-            goals_a_real, goals_b_real = _goals_in_schedule_order(match, source_match)
+            ordered = _candidate_in_schedule_order(match, source_match)
+            if is_knockout_phase(match.phase) and not ordered.qualified_team:
+                warnings.append(f"Resultado {match.match_id} encontrado, pero sin equipo clasificado; se reintentara.")
+                continue
             existing_by_id[match.match_id] = MatchResult(
                 match_id=match.match_id,
                 team_a=match.team_a,
                 team_b=match.team_b,
-                goals_a_real=goals_a_real,
-                goals_b_real=goals_b_real,
+                goals_a_real=ordered.goals_a_real,
+                goals_b_real=ordered.goals_b_real,
                 status="final",
                 phase=match.phase,
                 kickoff_at=match.kickoff_at,
                 source=source_match.source,
                 source_url=source_match.source_url,
                 confirmed=True,
+                final_goals_a=ordered.final_goals_a,
+                final_goals_b=ordered.final_goals_b,
+                penalties_a=ordered.penalties_a,
+                penalties_b=ordered.penalties_b,
+                qualified_team=ordered.qualified_team,
+                decision=ordered.decision,
             )
     return list(existing_by_id.values()), warnings
 
@@ -208,16 +218,43 @@ def _parse_espn_event(event: dict, source: str, url: str) -> MatchResult | None:
     team_b = canonical_team_name(away.get("team", {}).get("displayName", ""))
     if not team_a or not team_b:
         return None
+    home_total = _to_int(home.get("score"))
+    away_total = _to_int(away.get("score"))
+    home_periods = _period_scores(home)
+    away_periods = _period_scores(away)
+    status_period = _to_int(competition.get("status", {}).get("period")) or 0
+    has_extra_time = status_period > 2 or len(home_periods) > 2 or len(away_periods) > 2
+    home_from_events = _regulation_score_from_details(competition, home)
+    away_from_events = _regulation_score_from_details(competition, away)
+    home_regulation = home_from_events if home_from_events is not None else sum(home_periods[:2]) if len(home_periods) >= 2 else home_total
+    away_regulation = away_from_events if away_from_events is not None else sum(away_periods[:2]) if len(away_periods) >= 2 else away_total
+    penalties_a = _to_int(home.get("shootoutScore"))
+    penalties_b = _to_int(away.get("shootoutScore"))
+    qualified = next(
+        (
+            canonical_team_name(item.get("team", {}).get("displayName", ""))
+            for item in competitors
+            if item.get("winner") is True
+        ),
+        None,
+    )
+    decision = "penalties" if penalties_a is not None or penalties_b is not None else "extra_time" if has_extra_time else "regular_time"
     return MatchResult(
         match_id=f"{_slug(team_a)}_vs_{_slug(team_b)}",
         team_a=team_a,
         team_b=team_b,
-        goals_a_real=_to_int(home.get("score")),
-        goals_b_real=_to_int(away.get("score")),
+        goals_a_real=home_regulation,
+        goals_b_real=away_regulation,
         status="final",
         source=source,
         source_url=url,
         confirmed=True,
+        final_goals_a=home_total,
+        final_goals_b=away_total,
+        penalties_a=penalties_a,
+        penalties_b=penalties_b,
+        qualified_team=qualified,
+        decision=decision,
     )
 
 
@@ -250,16 +287,61 @@ def _find_candidate(match: MatchResult, candidates: list[MatchResult]) -> MatchR
     return None
 
 
-def _goals_in_schedule_order(match: MatchResult, candidate: MatchResult) -> tuple[int | None, int | None]:
+def _candidate_in_schedule_order(match: MatchResult, candidate: MatchResult) -> MatchResult:
     if _norm(candidate.team_a) == _norm(match.team_a):
-        return candidate.goals_a_real, candidate.goals_b_real
-    return candidate.goals_b_real, candidate.goals_a_real
+        return candidate
+    return MatchResult(
+        match_id=candidate.match_id,
+        team_a=match.team_a,
+        team_b=match.team_b,
+        goals_a_real=candidate.goals_b_real,
+        goals_b_real=candidate.goals_a_real,
+        status=candidate.status,
+        source=candidate.source,
+        source_url=candidate.source_url,
+        confirmed=candidate.confirmed,
+        final_goals_a=candidate.final_goals_b,
+        final_goals_b=candidate.final_goals_a,
+        penalties_a=candidate.penalties_b,
+        penalties_b=candidate.penalties_a,
+        qualified_team=candidate.qualified_team,
+        decision=candidate.decision,
+    )
+
+
+def _goals_in_schedule_order(match: MatchResult, candidate: MatchResult) -> tuple[int | None, int | None]:
+    ordered = _candidate_in_schedule_order(match, candidate)
+    return ordered.goals_a_real, ordered.goals_b_real
+
+
+def _period_scores(competitor: dict[str, Any]) -> list[int]:
+    values = []
+    for line in competitor.get("linescores") or []:
+        value = _to_int(line.get("value", line.get("displayValue")))
+        if value is not None:
+            values.append(value)
+    return values
+
+
+def _regulation_score_from_details(competition: dict[str, Any], competitor: dict[str, Any]) -> int | None:
+    details = competition.get("details")
+    if not isinstance(details, list):
+        return None
+    team_id = str(competitor.get("team", {}).get("id", ""))
+    if not team_id:
+        return None
+    return sum(
+        _to_int(detail.get("scoreValue")) or 0
+        for detail in details
+        if detail.get("scoringPlay") is True
+        and detail.get("shootout") is not True
+        and (_to_int(detail.get("clock", {}).get("value")) or 0) <= 90 * 60
+        and str(detail.get("team", {}).get("id", "")) == team_id
+    )
 
 
 def _is_knockout(phase: str | None) -> bool:
-    if not phase:
-        return False
-    return "group" not in phase.lower() and "grupo" not in phase.lower()
+    return is_knockout_phase(phase)
 
 
 def _to_int(value: Any) -> int | None:

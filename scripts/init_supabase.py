@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from polla.config import config_path, data_path, load_json, output_path
 from polla.models import MatchResult
 from polla.results import load_confirmed_results
+from polla.knockout import bracket_matches
 from polla.schedule import load_schedule
 from polla.store import hash_pin
 from polla.supabase_store import SupabaseStore
@@ -52,7 +53,9 @@ def main() -> int:
     store.client.table("users").upsert(users).execute()
     group = store.group_by_invite_code("EXE2")
     if group is None:
-        group = store.create_group("Exe2", "EXE2", "admin")
+        group = store.create_group("Exe2", "EXE2", "admin", competition_mode="group_stage")
+    else:
+        store.client.table("polla_groups").update({"competition_mode": "group_stage"}).eq("group_id", group.group_id).execute()
     for user in users:
         store.create_membership(
             group.group_id,
@@ -60,7 +63,20 @@ def main() -> int:
             role="admin" if user["participant"] == "admin" else "player",
             status="active",
         )
-    store.replace_rows("matches", [_match_row(match) for match in load_schedule(config_path("calendario_partidos.json"))])
+    knockout_group = store.group_by_invite_code("EXE2KO")
+    if knockout_group is None:
+        knockout_group = store.create_group("Exe2 Knockout", "EXE2KO", "admin", competition_mode="knockout")
+    for participant in ["admin", "CarlosF", "Alex", "Oscar", "Charlie", "Eduard"]:
+        if any(user["participant"] == participant for user in users):
+            store.create_membership(
+                knockout_group.group_id,
+                participant,
+                role="admin" if participant == "admin" else "player",
+                status="active",
+            )
+    group_matches = load_schedule(config_path("calendario_partidos.json"))
+    knockout_matches = bracket_matches(load_json(config_path("calendario_eliminatorias.json")))
+    store.replace_rows("matches", [_match_row(match) for match in group_matches + knockout_matches])
     store.replace_rows("results", [_result_row(result) for result in _dedupe_results(_load_initial_results())])
     store.replace_rows("settings", _initial_settings())
     ranking_rows = _ranking_rows(output_path("ranking_polla.xlsx"))
@@ -97,6 +113,12 @@ def _result_row(result) -> dict:
         "source": result.source,
         "source_url": result.source_url,
         "confirmed": result.confirmed,
+        "final_goals_a": result.final_goals_a,
+        "final_goals_b": result.final_goals_b,
+        "penalties_a": result.penalties_a,
+        "penalties_b": result.penalties_b,
+        "qualified_team": result.qualified_team,
+        "decision": result.decision,
     }
 
 

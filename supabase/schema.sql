@@ -11,7 +11,8 @@ create table if not exists polla_groups (
   invite_code text not null unique,
   created_by text not null references users(participant),
   active boolean not null default true,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  competition_mode text not null default 'full' check (competition_mode in ('group_stage', 'knockout', 'full'))
 );
 
 create table if not exists group_memberships (
@@ -35,32 +36,37 @@ create table if not exists matches (
 );
 
 create table if not exists predictions (
+  group_id uuid not null references polla_groups(group_id) on delete cascade,
   participant text not null references users(participant),
   match_id text not null references matches(match_id),
   team_a text not null,
   team_b text not null,
   goals_a_pred int,
   goals_b_pred int,
+  qualified_team_pred text,
   updated_at timestamptz,
-  primary key (participant, match_id)
+  primary key (group_id, participant, match_id)
 );
 
 create table if not exists group_picks (
+  group_id uuid not null references polla_groups(group_id) on delete cascade,
   participant text not null references users(participant),
   "group" text not null,
   first text,
   second text,
   third text,
   updated_at timestamptz,
-  primary key (participant, "group")
+  primary key (group_id, participant, "group")
 );
 
 create table if not exists final_picks (
-  participant text primary key references users(participant),
+  group_id uuid not null references polla_groups(group_id) on delete cascade,
+  participant text not null references users(participant),
   champion text,
   runner_up text,
   third_place text,
-  updated_at timestamptz
+  updated_at timestamptz,
+  primary key (group_id, participant)
 );
 
 create table if not exists results (
@@ -75,6 +81,12 @@ create table if not exists results (
   source text,
   source_url text,
   confirmed boolean not null default false
+  ,final_goals_a int
+  ,final_goals_b int
+  ,penalties_a int
+  ,penalties_b int
+  ,qualified_team text
+  ,decision text
 );
 
 create table if not exists audit_log (
@@ -87,6 +99,7 @@ create table if not exists audit_log (
   new_value text,
   status text not null,
   reason text
+  ,group_id uuid references polla_groups(group_id) on delete set null
 );
 
 create table if not exists settings (
@@ -116,8 +129,8 @@ create table if not exists detail (
 alter table ranking add column if not exists group_id uuid references polla_groups(group_id);
 alter table detail add column if not exists group_id uuid references polla_groups(group_id);
 
-insert into polla_groups (name, invite_code, created_by)
-select 'Exe2', 'EXE2', participant
+insert into polla_groups (name, invite_code, created_by, competition_mode)
+select 'Exe2', 'EXE2', participant, 'group_stage'
 from users
 where participant = 'admin'
 on conflict (invite_code) do nothing;

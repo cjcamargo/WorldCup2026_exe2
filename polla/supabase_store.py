@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Any
 
 from .models import AuditChange, FinalPicks, GroupMembership, GroupPick, MatchResult, PollaGroup, Prediction, User
+from .knockout import is_knockout_phase
 from .prediction_rules import prediction_is_locked, prediction_lock_at
 from .schedule import canonical_team_name
 from .timeutils import as_bogota, parse_datetime
@@ -54,6 +55,7 @@ class SupabaseStore:
                 invite_code=row["invite_code"],
                 created_by=row["created_by"],
                 active=bool(row.get("active", True)),
+                competition_mode=row.get("competition_mode") or "full",
             )
             for row in rows
         ]
@@ -101,14 +103,16 @@ class SupabaseStore:
             invite_code=row["invite_code"],
             created_by=row["created_by"],
             active=bool(row.get("active", True)),
+            competition_mode=row.get("competition_mode") or "full",
         )
 
-    def create_group(self, name: str, invite_code: str, created_by: str) -> PollaGroup:
+    def create_group(self, name: str, invite_code: str, created_by: str, competition_mode: str = "full") -> PollaGroup:
         row = {
             "name": name,
             "invite_code": invite_code.strip().upper(),
             "created_by": created_by,
             "active": True,
+            "competition_mode": competition_mode,
         }
         data = self.client.table("polla_groups").insert(row).execute().data or []
         created = data[0] if data else self._one("polla_groups", {"invite_code": row["invite_code"]})
@@ -120,6 +124,7 @@ class SupabaseStore:
             invite_code=created["invite_code"],
             created_by=created["created_by"],
             active=bool(created.get("active", True)),
+            competition_mode=created.get("competition_mode") or competition_mode,
         )
         self.create_membership(group.group_id, created_by, role="admin", status="active")
         return group
@@ -152,10 +157,12 @@ class SupabaseStore:
             for row in rows
         ]
 
-    def predictions(self, participant: str | None = None) -> list[Prediction]:
+    def predictions(self, participant: str | None = None, group_id: str | None = None) -> list[Prediction]:
         query = self.client.table("predictions").select("*")
         if participant:
             query = query.eq("participant", participant)
+        if group_id:
+            query = query.eq("group_id", group_id)
         rows = query.execute().data or []
         return [
             Prediction(
@@ -165,14 +172,19 @@ class SupabaseStore:
                 team_b=row["team_b"],
                 goals_a_pred=row.get("goals_a_pred"),
                 goals_b_pred=row.get("goals_b_pred"),
+                winner_pred=row.get("qualified_team_pred"),
+                group_id=row.get("group_id"),
+                qualified_team_pred=row.get("qualified_team_pred"),
             )
             for row in rows
         ]
 
-    def group_picks(self, participant: str | None = None) -> list[GroupPick]:
+    def group_picks(self, participant: str | None = None, group_id: str | None = None) -> list[GroupPick]:
         query = self.client.table("group_picks").select("*")
         if participant:
             query = query.eq("participant", participant)
+        if group_id:
+            query = query.eq("group_id", group_id)
         rows = query.execute().data or []
         return [
             GroupPick(
@@ -181,14 +193,17 @@ class SupabaseStore:
                 first=row.get("first"),
                 second=row.get("second"),
                 third=row.get("third"),
+                group_id=row.get("group_id"),
             )
             for row in rows
         ]
 
-    def final_picks(self, participant: str | None = None) -> list[FinalPicks]:
+    def final_picks(self, participant: str | None = None, group_id: str | None = None) -> list[FinalPicks]:
         query = self.client.table("final_picks").select("*")
         if participant:
             query = query.eq("participant", participant)
+        if group_id:
+            query = query.eq("group_id", group_id)
         rows = query.execute().data or []
         return [
             FinalPicks(
@@ -196,6 +211,7 @@ class SupabaseStore:
                 champion=row.get("champion"),
                 runner_up=row.get("runner_up"),
                 third_place=row.get("third_place"),
+                group_id=row.get("group_id"),
             )
             for row in rows
         ]
@@ -215,6 +231,12 @@ class SupabaseStore:
                 source=row.get("source"),
                 source_url=row.get("source_url"),
                 confirmed=bool(row.get("confirmed", False)),
+                final_goals_a=row.get("final_goals_a"),
+                final_goals_b=row.get("final_goals_b"),
+                penalties_a=row.get("penalties_a"),
+                penalties_b=row.get("penalties_b"),
+                qualified_team=row.get("qualified_team"),
+                decision=row.get("decision"),
             )
             for row in rows
         ]
@@ -237,40 +259,74 @@ class SupabaseStore:
                 new_value=row.get("new_value"),
                 status=row["status"],
                 reason=row.get("reason"),
+                group_id=row.get("group_id"),
             )
             for row in rows
         ]
 
-    def save_prediction(self, participant: str, match: MatchResult, goals_a: int | None, goals_b: int | None, at: datetime) -> None:
+    def save_prediction(
+        self,
+        group_id: str,
+        participant: str,
+        match: MatchResult,
+        goals_a: int | None,
+        goals_b: int | None,
+        qualified_team_pred: str | None,
+        at: datetime,
+    ) -> None:
         schedule = self.matches()
+        if goals_a is None or goals_b is None:
+            raise ValueError("Ingresa ambos marcadores.")
         if prediction_is_locked(match, at, schedule):
             lock_at = prediction_lock_at(match, schedule)
             lock_text = lock_at.strftime("%Y-%m-%d %H:%M") if lock_at else "el cierre"
             raise ValueError(f"Las predicciones de este partido cerraron el {lock_text} hora Bogota.")
+        if is_knockout_phase(match.phase):
+            expected_qualifier = match.team_a if goals_a > goals_b else match.team_b if goals_b > goals_a else qualified_team_pred
+            if expected_qualifier not in {match.team_a, match.team_b}:
+                raise ValueError("Selecciona el equipo que clasifica.")
+            qualified_team_pred = expected_qualifier
         values = {
+            "group_id": group_id,
             "participant": participant,
             "match_id": match.match_id,
             "team_a": match.team_a,
             "team_b": match.team_b,
             "goals_a_pred": goals_a,
             "goals_b_pred": goals_b,
+            "qualified_team_pred": qualified_team_pred,
             "updated_at": at.isoformat(),
         }
-        old = self._one("predictions", {"participant": participant, "match_id": match.match_id})
+        old = self._one("predictions", {"group_id": group_id, "participant": participant, "match_id": match.match_id})
         self.client.table("predictions").upsert(values).execute()
-        self._audit_upsert(old, values, participant, match.match_id, at)
+        self._audit_upsert(old, values, participant, match.match_id, at, group_id)
 
     def save_group_pick(self, pick: GroupPick, at: datetime) -> None:
         values = {**asdict(pick), "updated_at": at.isoformat()}
-        old = self._one("group_picks", {"participant": pick.participant, "group": pick.group})
+        old = self._one("group_picks", {"group_id": pick.group_id, "participant": pick.participant, "group": pick.group})
         self.client.table("group_picks").upsert(values).execute()
-        self._audit_upsert(old, values, pick.participant, f"GROUP_{pick.group}", at)
+        self._audit_upsert(old, values, pick.participant, f"GROUP_{pick.group}", at, pick.group_id)
 
     def save_final_picks(self, picks: FinalPicks, at: datetime) -> None:
         values = {**asdict(picks), "updated_at": at.isoformat()}
-        old = self._one("final_picks", {"participant": picks.participant})
+        old = self._one("final_picks", {"group_id": picks.group_id, "participant": picks.participant})
         self.client.table("final_picks").upsert(values).execute()
-        self._audit_upsert(old, values, picks.participant, "FINAL_PICKS", at)
+        self._audit_upsert(old, values, picks.participant, "FINAL_PICKS", at, picks.group_id)
+
+    def upsert_matches(self, matches: list[MatchResult]) -> None:
+        if not matches:
+            return
+        self.client.table("matches").upsert([
+            {
+                "match_id": match.match_id,
+                "phase": match.phase,
+                "team_a": match.team_a,
+                "team_b": match.team_b,
+                "kickoff_at": match.kickoff_at.isoformat() if match.kickoff_at else None,
+                "status": match.status,
+            }
+            for match in matches
+        ]).execute()
 
     def save_setting(self, key: str, value: Any) -> None:
         self.client.table("settings").upsert({"key": key, "value": _encode(value)}).execute()
@@ -294,6 +350,7 @@ class SupabaseStore:
                 "new_value": _encode(change.new_value),
                 "status": change.status,
                 "reason": change.reason,
+                "group_id": change.group_id,
             }
             for change in changes
         ]).execute()
@@ -311,16 +368,24 @@ class SupabaseStore:
         rows = query.limit(1).execute().data or []
         return rows[0] if rows else None
 
-    def _audit_upsert(self, old: dict[str, Any] | None, new: dict[str, Any], participant: str, match_id: str, at: datetime) -> None:
+    def _audit_upsert(
+        self,
+        old: dict[str, Any] | None,
+        new: dict[str, Any],
+        participant: str,
+        match_id: str,
+        at: datetime,
+        group_id: str | None = None,
+    ) -> None:
         if old is None:
-            self.append_audit([AuditChange(at.isoformat(), participant, match_id, "prediction", None, new, "new")])
+            self.append_audit([AuditChange(at.isoformat(), participant, match_id, "prediction", None, new, "new", group_id=group_id)])
             return
         changes: list[AuditChange] = []
         for field, value in new.items():
             if field == "updated_at":
                 continue
             if str(old.get(field, "")) != str(value or ""):
-                changes.append(AuditChange(at.isoformat(), participant, match_id, field, old.get(field), value, "changed"))
+                changes.append(AuditChange(at.isoformat(), participant, match_id, field, old.get(field), value, "changed", group_id=group_id))
         self.append_audit(changes)
 
 

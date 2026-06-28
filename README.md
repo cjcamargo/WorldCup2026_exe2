@@ -17,6 +17,9 @@ La interfaz principal ya no depende de archivos Excel. Las predicciones nuevas s
 - Predicciones de todos los integrantes visibles solo cuando el partido ya esta bloqueado.
 - Top 3 por grupo y campeon, subcampeon y tercer puesto.
 - Ranking independiente para cada grupo de polla.
+- Grupo `Exe2 Knockout` independiente, con los 32 partidos eliminatorios y ranking iniciado en cero.
+- Pronostico eliminatorio a 90 minutos mas equipo clasificado.
+- Actualizacion automatica del bracket con ganadores y perdedores confirmados.
 - Resultados confirmados automaticamente.
 - Tabla de posiciones de los grupos obtenida desde ESPN.
 - Fallback calculado desde resultados confirmados si ESPN no esta disponible.
@@ -51,6 +54,8 @@ Los puntos por partido son acumulativos:
 | Diferencia de gol correcta | 1 |
 
 Un marcador exacto suma un maximo de **8 puntos**.
+
+En `Exe2 Knockout`, los goles se puntuan con el marcador a los 90 minutos. Los 3 puntos de ganador se asignan al equipo que clasifica; si el marcador pronosticado termina empatado, el usuario debe elegir quien avanza.
 
 Picks adicionales:
 
@@ -119,6 +124,16 @@ pip install -r requirements.txt
    - Service role key.
 
 La service role key es secreta. No debe guardarse en Git ni exponerse en el navegador.
+
+### Actualizar una instalacion existente para knockout
+
+No reemplaces ni borres las tablas actuales. Ejecuta una sola vez en `Supabase > SQL Editor` el contenido de:
+
+```text
+supabase/migrations/20260628_knockout_group.sql
+```
+
+La migracion conserva las predicciones de `Exe2`, las asocia al grupo original, crea `Exe2 Knockout` (`EXE2KO`), agrega como miembros activos a `CarlosF`, `Alex`, `Oscar`, `Charlie` y `Eduard`, e incorpora `M073-M104`.
 
 ### Inicializar datos
 
@@ -199,12 +214,14 @@ En cada corrida:
 
 1. Consulta partidos cuyo resultado ya deberia estar disponible.
 2. Usa ESPN como primera fuente y fuentes de respaldo configuradas.
-3. Guarda resultados confirmados en Supabase.
-4. Consulta las tablas de posiciones de ESPN.
-5. Si ESPN falla, calcula posiciones desde los resultados confirmados.
-6. Recalcula ranking y detalle para cada grupo de polla.
-7. Envia un unico correo agrupado con cambios nuevos.
-8. Registra la fecha de la ultima ejecucion.
+3. En eliminatorias separa marcador a 90 minutos, marcador final, penales y equipo clasificado.
+4. Actualiza automaticamente los equipos del siguiente cruce del bracket.
+5. Guarda resultados confirmados en Supabase.
+6. Consulta las tablas de posiciones de ESPN.
+7. Si ESPN falla, calcula posiciones desde los resultados confirmados.
+8. Recalcula ranking y detalle para cada grupo de polla.
+9. Envia un unico correo agrupado con cambios nuevos.
+10. Registra la fecha de la ultima ejecucion.
 
 Secrets requeridos en GitHub:
 
@@ -339,7 +356,9 @@ polla/scoring.py                    Sistema de puntos
 scripts/update_app_backend.py        Job automatico
 scripts/init_supabase.py             Inicializacion del backend
 supabase/schema.sql                  Esquema de base de datos
+supabase/migrations/                 Migraciones incrementales
 config/calendario_partidos.json      Calendario en hora Bogota
+config/calendario_eliminatorias.json Bracket knockout en hora Bogota
 config/resultados.json               Fuentes y ventanas de consulta
 config/televisacion.json             Canales por partido
 config/puntajes.json                 Reglas de puntuacion

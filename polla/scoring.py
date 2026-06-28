@@ -4,6 +4,7 @@ from dataclasses import asdict
 from typing import Any
 
 from .models import FinalPicks, GroupPick, MatchResult, Prediction
+from .knockout import is_knockout_phase
 
 
 def score_predictions(
@@ -105,13 +106,19 @@ def score_group_picks(
 
 
 def _score_match(pred: Prediction, result: MatchResult, points: dict[str, int]) -> dict[str, Any]:
+    predicted_qualifier = pred.qualified_team_pred or pred.winner_pred
+    pred_score = f"{pred.goals_a_pred}-{pred.goals_b_pred}"
+    real_score = f"{result.goals_a_real}-{result.goals_b_real}"
+    if is_knockout_phase(result.phase):
+        pred_score += f" | Clasifica {predicted_qualifier or '-'}"
+        real_score += f" | Clasifica {result.qualified_team or '-'}"
     row = {
         "participant": pred.participant,
         "match_id": pred.match_id,
         "team_a": pred.team_a,
         "team_b": pred.team_b,
-        "pred_score": f"{pred.goals_a_pred}-{pred.goals_b_pred}",
-        "real_score": f"{result.goals_a_real}-{result.goals_b_real}",
+        "pred_score": pred_score,
+        "real_score": real_score,
         "exact_score_points": 0,
         "winner_points": 0,
         "team_a_goals_points": 0,
@@ -123,7 +130,10 @@ def _score_match(pred: Prediction, result: MatchResult, points: dict[str, int]) 
     real_outcome = _outcome(result.goals_a_real, result.goals_b_real)
     if pred.goals_a_pred == result.goals_a_real and pred.goals_b_pred == result.goals_b_real:
         row["exact_score_points"] = points["exact_score"]
-    if pred_outcome is not None and pred_outcome == real_outcome:
+    if is_knockout_phase(result.phase) and result.qualified_team:
+        if _same_team(predicted_qualifier, result.qualified_team):
+            row["winner_points"] = points["winner"]
+    elif pred_outcome is not None and pred_outcome == real_outcome:
         row["winner_points"] = points["winner"]
     if pred.goals_a_pred == result.goals_a_real:
         row["team_a_goals_points"] = points["team_goals"]
