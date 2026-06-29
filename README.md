@@ -251,6 +251,7 @@ El workflow:
 es ejecutado por un cron externo todos los dias a las **8:05 a. m. hora Bogota** (`13:05 UTC`). Envia un correo individual a los destinatarios configurados en `config/recordatorios.json` con:
 
 - Partidos del dia.
+- Partidos de fase de grupos y eliminatorias.
 - Horarios en Bogota.
 - Grupo y canales de television.
 - Recordatorio del cierre diario: primer kickoff + 1 minuto o 2:00 p. m., lo que ocurra primero.
