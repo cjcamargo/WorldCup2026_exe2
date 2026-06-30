@@ -438,7 +438,16 @@ def ranking_view(state: dict[str, Any], group_id: str) -> None:
     if not ranking:
         st.info("Todavia no hay puntos calculados.")
         return
-    predicted_counts = _predicted_match_counts(state["predictions"], group_id)
+    group = next((item for item in state["groups"] if item.group_id == group_id), None)
+    group_matches = matches_for_mode(state["matches"], group.competition_mode) if group else []
+    group_match_ids = {match.match_id for match in group_matches}
+    group_results = [
+        result for result in state["results"]
+        if result.match_id in group_match_ids
+    ]
+    predicted_counts = _predicted_match_counts(
+        state["predictions"], group_results, group_id,
+    )
     st.markdown('<div class="section-title">Tabla de posiciones</div>', unsafe_allow_html=True)
     for idx, row in enumerate(ranking, start=1):
         raw_rank = row.get("rank") or idx
@@ -462,7 +471,7 @@ def ranking_view(state: dict[str, Any], group_id: str) -> None:
               </div>
               <div class="rank-stats">
                 <div class="rank-points"><strong>{points}</strong><span>pts</span></div>
-                <div class="rank-ratio"><span>Pts / partido</span><strong>{points_per_prediction:.2f}</strong></div>
+                <div class="rank-ratio"><span>Pts / partido con resultado</span><strong>{points_per_prediction:.2f}</strong></div>
               </div>
             </div>
             """,
@@ -1054,12 +1063,19 @@ def _final_picks_setting_key(group: Any) -> str:
     return f"final_picks_closed_{group.invite_code}"
 
 
-def _predicted_match_counts(predictions: list[Any], group_id: str | None = None) -> dict[str, int]:
+def _predicted_match_counts(
+    predictions: list[Any],
+    results: list[MatchResult],
+    group_id: str | None = None,
+) -> dict[str, int]:
+    closed_match_ids = {result.match_id for result in results if result.confirmed}
     match_ids_by_participant: dict[str, set[str]] = defaultdict(set)
     for prediction in predictions:
         if group_id is not None and prediction.group_id != group_id:
             continue
         if prediction.goals_a_pred is None or prediction.goals_b_pred is None:
+            continue
+        if prediction.match_id not in closed_match_ids:
             continue
         match_ids_by_participant[prediction.participant].add(prediction.match_id)
     return {
