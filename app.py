@@ -876,6 +876,8 @@ def _match_prediction_card(
     with st.container(border=True):
         st.markdown(card_intro_html, unsafe_allow_html=True)
         with st.form(f"pred_{group_id}_{match.match_id}"):
+            if is_knockout_phase(match.phase):
+                st.caption("Pronostica el marcador al finalizar 120 minutos, sin incluir penales.")
             col_a, score_sep, col_b = st.columns([0.8, 0.18, 0.8], vertical_alignment="bottom")
             goals_a = col_a.number_input(
                 match.team_a,

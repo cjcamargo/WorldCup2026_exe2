@@ -60,20 +60,23 @@ def test_competition_modes_separate_group_and_knockout_matches():
     assert [match.match_id for match in matches_for_mode(matches, "knockout")] == ["M073"]
 
 
-def test_knockout_exact_score_and_qualifier_keep_eight_point_maximum():
+def test_knockout_score_uses_120_minute_result_and_qualifier():
     prediction = Prediction(
-        "Alex", "M073", "South Africa", "Canada", 1, 1,
+        "Alex", "M073", "South Africa", "Canada", 2, 2,
         winner_pred="Canada", qualified_team_pred="Canada",
     )
     result = MatchResult(
         "M073", "South Africa", "Canada", 1, 1,
         phase="Round of 32", confirmed=True, qualified_team="Canada",
+        final_goals_a=2, final_goals_b=2,
     )
 
     ranking, detail = score_predictions([prediction], [result], [FinalPicks("Alex")], {}, POINTS)
 
     assert ranking[0]["points"] == 8
+    assert detail[0]["exact_score_points"] == 2
     assert detail[0]["winner_points"] == 3
+    assert "2-2 (120 min)" in detail[0]["real_score"]
     assert "Clasifica Canada" in detail[0]["real_score"]
 
 

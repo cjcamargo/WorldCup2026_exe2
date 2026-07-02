@@ -18,7 +18,7 @@ La interfaz principal ya no depende de archivos Excel. Las predicciones nuevas s
 - Top 3 por grupo y campeon, subcampeon y tercer puesto.
 - Ranking independiente para cada grupo de polla.
 - Grupo `Exe2 Knockout` independiente, con los 32 partidos eliminatorios y ranking iniciado en cero.
-- Pronostico eliminatorio a 90 minutos mas equipo clasificado.
+- Pronostico eliminatorio al finalizar 120 minutos, sin penales, mas equipo clasificado.
 - Actualizacion automatica del bracket con ganadores y perdedores confirmados.
 - Resultados confirmados automaticamente.
 - Tabla de posiciones de los grupos obtenida desde ESPN.
@@ -55,7 +55,7 @@ Los puntos por partido son acumulativos:
 
 Un marcador exacto suma un maximo de **8 puntos**.
 
-En `Exe2 Knockout`, los goles se puntuan con el marcador a los 90 minutos. Los 3 puntos de ganador se asignan al equipo que clasifica; si el marcador pronosticado termina empatado, el usuario debe elegir quien avanza.
+En `Exe2 Knockout`, los goles se puntuan con el marcador al finalizar 120 minutos, incluida la prorroga y sin contar penales. Los 3 puntos de ganador se asignan al equipo que clasifica; si el marcador pronosticado termina empatado, el usuario debe elegir quien avanza.
 
 Picks adicionales:
 
@@ -214,7 +214,7 @@ En cada corrida:
 
 1. Consulta partidos cuyo resultado ya deberia estar disponible.
 2. Usa ESPN como primera fuente y fuentes de respaldo configuradas.
-3. En eliminatorias separa marcador a 90 minutos, marcador final, penales y equipo clasificado.
+3. En eliminatorias separa marcador a 90 minutos, marcador a 120 minutos, penales y equipo clasificado.
 4. Actualiza automaticamente los equipos del siguiente cruce del bracket.
 5. Guarda resultados confirmados en Supabase.
 6. Consulta las tablas de posiciones de ESPN.

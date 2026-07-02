@@ -107,11 +107,12 @@ def score_group_picks(
 
 def _score_match(pred: Prediction, result: MatchResult, points: dict[str, int]) -> dict[str, Any]:
     predicted_qualifier = pred.qualified_team_pred or pred.winner_pred
+    real_goals_a, real_goals_b = _score_goals(result)
     pred_score = f"{pred.goals_a_pred}-{pred.goals_b_pred}"
-    real_score = f"{result.goals_a_real}-{result.goals_b_real}"
+    real_score = f"{real_goals_a}-{real_goals_b}"
     if is_knockout_phase(result.phase):
         pred_score += f" | Clasifica {predicted_qualifier or '-'}"
-        real_score += f" | Clasifica {result.qualified_team or '-'}"
+        real_score += f" (120 min) | Clasifica {result.qualified_team or '-'}"
     row = {
         "participant": pred.participant,
         "match_id": pred.match_id,
@@ -127,22 +128,32 @@ def _score_match(pred: Prediction, result: MatchResult, points: dict[str, int]) 
         "points": 0,
     }
     pred_outcome = _outcome(pred.goals_a_pred, pred.goals_b_pred)
-    real_outcome = _outcome(result.goals_a_real, result.goals_b_real)
-    if pred.goals_a_pred == result.goals_a_real and pred.goals_b_pred == result.goals_b_real:
+    real_outcome = _outcome(real_goals_a, real_goals_b)
+    if pred.goals_a_pred == real_goals_a and pred.goals_b_pred == real_goals_b:
         row["exact_score_points"] = points["exact_score"]
     if is_knockout_phase(result.phase) and result.qualified_team:
         if _same_team(predicted_qualifier, result.qualified_team):
             row["winner_points"] = points["winner"]
     elif pred_outcome is not None and pred_outcome == real_outcome:
         row["winner_points"] = points["winner"]
-    if pred.goals_a_pred == result.goals_a_real:
+    if pred.goals_a_pred == real_goals_a:
         row["team_a_goals_points"] = points["team_goals"]
-    if pred.goals_b_pred == result.goals_b_real:
+    if pred.goals_b_pred == real_goals_b:
         row["team_b_goals_points"] = points["team_goals"]
-    if _diff(pred.goals_a_pred, pred.goals_b_pred) == _diff(result.goals_a_real, result.goals_b_real):
+    if _diff(pred.goals_a_pred, pred.goals_b_pred) == _diff(real_goals_a, real_goals_b):
         row["goal_difference_points"] = points["goal_difference"]
     row["points"] = sum(value for key, value in row.items() if key.endswith("_points"))
     return row
+
+
+def _score_goals(result: MatchResult) -> tuple[int | None, int | None]:
+    if (
+        is_knockout_phase(result.phase)
+        and result.final_goals_a is not None
+        and result.final_goals_b is not None
+    ):
+        return result.final_goals_a, result.final_goals_b
+    return result.goals_a_real, result.goals_b_real
 
 
 def _score_finals(picks: FinalPicks, final_results: dict[str, str | None], points: dict[str, int]) -> dict[str, Any]:
