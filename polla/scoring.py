@@ -107,12 +107,12 @@ def score_group_picks(
 
 def _score_match(pred: Prediction, result: MatchResult, points: dict[str, int]) -> dict[str, Any]:
     predicted_qualifier = pred.qualified_team_pred or pred.winner_pred
-    real_goals_a, real_goals_b = _score_goals(result)
+    real_goals_a, real_goals_b = result.goals_a_real, result.goals_b_real
     pred_score = f"{pred.goals_a_pred}-{pred.goals_b_pred}"
     real_score = f"{real_goals_a}-{real_goals_b}"
     if is_knockout_phase(result.phase):
         pred_score += f" | Clasifica {predicted_qualifier or '-'}"
-        real_score += f" (120 min) | Clasifica {result.qualified_team or '-'}"
+        real_score += f" (90 min) | Clasifica {result.qualified_team or '-'}"
     row = {
         "participant": pred.participant,
         "match_id": pred.match_id,
@@ -144,16 +144,6 @@ def _score_match(pred: Prediction, result: MatchResult, points: dict[str, int]) 
         row["goal_difference_points"] = points["goal_difference"]
     row["points"] = sum(value for key, value in row.items() if key.endswith("_points"))
     return row
-
-
-def _score_goals(result: MatchResult) -> tuple[int | None, int | None]:
-    if (
-        is_knockout_phase(result.phase)
-        and result.final_goals_a is not None
-        and result.final_goals_b is not None
-    ):
-        return result.final_goals_a, result.final_goals_b
-    return result.goals_a_real, result.goals_b_real
 
 
 def _score_finals(picks: FinalPicks, final_results: dict[str, str | None], points: dict[str, int]) -> dict[str, Any]:

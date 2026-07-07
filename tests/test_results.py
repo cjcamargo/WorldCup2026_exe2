@@ -2,10 +2,27 @@ from datetime import timedelta
 
 import polla.results as results_module
 from polla.models import MatchResult
-from polla.results import update_results_from_sources
+from polla.results import should_check_result, update_results_from_sources
 from polla.results import _parse_score_lines
 from polla.schedule import norm_text
 from polla.timeutils import now_bogota
+
+
+def test_knockout_results_can_be_refreshed_for_72_hours():
+    at = now_bogota()
+    match = MatchResult(
+        "M082", "Belgium", "Senegal", phase="Round of 32",
+        kickoff_at=at - timedelta(hours=48),
+    )
+    cfg = {
+        "group_stage_expected_minutes": 120,
+        "knockout_expected_minutes": 180,
+        "result_first_check_minutes_after_expected_end": 5,
+        "result_timeout_hours_after_kickoff": 24,
+        "knockout_result_refresh_hours_after_kickoff": 72,
+    }
+
+    assert should_check_result(match, cfg, at)
 
 
 def test_reversed_source_candidate_scores_are_saved_in_schedule_order(monkeypatch):

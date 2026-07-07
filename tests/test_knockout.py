@@ -15,8 +15,8 @@ POINTS = {
     "team_goals": 1,
     "goal_difference": 1,
     "champion": 18,
-    "runner_up": 15,
-    "third_place": 12,
+    "runner_up": 9,
+    "third_place": 5,
 }
 
 
@@ -60,9 +60,9 @@ def test_competition_modes_separate_group_and_knockout_matches():
     assert [match.match_id for match in matches_for_mode(matches, "knockout")] == ["M073"]
 
 
-def test_knockout_score_uses_120_minute_result_and_qualifier():
+def test_knockout_score_uses_90_minute_result_and_qualifier():
     prediction = Prediction(
-        "Alex", "M073", "South Africa", "Canada", 2, 2,
+        "Alex", "M073", "South Africa", "Canada", 1, 1,
         winner_pred="Canada", qualified_team_pred="Canada",
     )
     result = MatchResult(
@@ -76,7 +76,7 @@ def test_knockout_score_uses_120_minute_result_and_qualifier():
     assert ranking[0]["points"] == 8
     assert detail[0]["exact_score_points"] == 2
     assert detail[0]["winner_points"] == 3
-    assert "2-2 (120 min)" in detail[0]["real_score"]
+    assert "1-1 (90 min)" in detail[0]["real_score"]
     assert "Clasifica Canada" in detail[0]["real_score"]
 
 
@@ -112,6 +112,39 @@ def test_espn_parser_separates_regulation_extra_time_and_penalties():
     assert (result.penalties_a, result.penalties_b) == (4, 3)
     assert result.qualified_team == "Brazil"
     assert result.decision == "penalties"
+
+
+def test_espn_parser_builds_120_minute_score_from_events_when_score_is_stale():
+    event = {
+        "competitions": [{
+            "status": {"period": 4, "type": {"completed": True}},
+            "competitors": [
+                {
+                    "homeAway": "home", "winner": True, "score": "2",
+                    "team": {"id": "1", "displayName": "Belgium"},
+                },
+                {
+                    "homeAway": "away", "winner": False, "score": "2",
+                    "team": {"id": "2", "displayName": "Senegal"},
+                },
+            ],
+            "details": [
+                {"scoringPlay": True, "shootout": False, "scoreValue": 1, "clock": {"value": 1200}, "team": {"id": "2"}},
+                {"scoringPlay": True, "shootout": False, "scoreValue": 1, "clock": {"value": 2400}, "team": {"id": "2"}},
+                {"scoringPlay": True, "shootout": False, "scoreValue": 1, "clock": {"value": 5100}, "team": {"id": "1"}},
+                {"scoringPlay": True, "shootout": False, "scoreValue": 1, "clock": {"value": 5340}, "team": {"id": "1"}},
+                {"scoringPlay": True, "shootout": False, "scoreValue": 1, "clock": {"value": 7500}, "team": {"id": "1"}},
+            ],
+        }]
+    }
+
+    result = _parse_espn_event(event, "espn", "https://example.test")
+
+    assert result is not None
+    assert (result.goals_a_real, result.goals_b_real) == (2, 2)
+    assert (result.final_goals_a, result.final_goals_b) == (3, 2)
+    assert result.qualified_team == "Belgium"
+    assert result.decision == "extra_time"
 
 
 def test_group_rankings_do_not_mix_group_stage_and_knockout_points():

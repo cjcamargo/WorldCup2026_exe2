@@ -18,7 +18,7 @@ La interfaz principal ya no depende de archivos Excel. Las predicciones nuevas s
 - Top 3 por grupo y campeon, subcampeon y tercer puesto.
 - Ranking independiente para cada grupo de polla.
 - Grupo `Exe2 Knockout` independiente, con los 32 partidos eliminatorios y ranking iniciado en cero.
-- Pronostico eliminatorio al finalizar 120 minutos, sin penales, mas equipo clasificado.
+- Pronostico eliminatorio al finalizar 90 minutos, mas equipo clasificado.
 - Actualizacion automatica del bracket con ganadores y perdedores confirmados.
 - Resultados confirmados automaticamente.
 - Tabla de posiciones de los grupos obtenida desde ESPN.
@@ -55,7 +55,7 @@ Los puntos por partido son acumulativos:
 
 Un marcador exacto suma un maximo de **8 puntos**.
 
-En `Exe2 Knockout`, los goles se puntuan con el marcador al finalizar 120 minutos, incluida la prorroga y sin contar penales. Los 3 puntos de ganador se asignan al equipo que clasifica; si el marcador pronosticado termina empatado, el usuario debe elegir quien avanza.
+En `Exe2 Knockout`, los goles se puntuan con el marcador al finalizar 90 minutos. Los 3 puntos de ganador se asignan al equipo que clasifica; si el marcador pronosticado termina empatado, el usuario debe elegir quien avanza.
 
 Picks adicionales:
 
@@ -65,8 +65,8 @@ Picks adicionales:
 | Segundo del grupo en posicion exacta | 3 |
 | Tercero del grupo en posicion exacta | 2 |
 | Campeon | 18 |
-| Subcampeon | 15 |
-| Tercer puesto | 12 |
+| Subcampeon | 9 |
+| Tercer puesto | 5 |
 
 La configuracion editable esta en `config/puntajes.json`.
 

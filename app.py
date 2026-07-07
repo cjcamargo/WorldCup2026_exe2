@@ -877,7 +877,7 @@ def _match_prediction_card(
         st.markdown(card_intro_html, unsafe_allow_html=True)
         with st.form(f"pred_{group_id}_{match.match_id}"):
             if is_knockout_phase(match.phase):
-                st.caption("Pronostica el marcador al finalizar 120 minutos, sin incluir penales.")
+                st.caption("Pronostica el marcador al finalizar 90 minutos. Si hay empate, elige quien clasifica.")
             col_a, score_sep, col_b = st.columns([0.8, 0.18, 0.8], vertical_alignment="bottom")
             goals_a = col_a.number_input(
                 match.team_a,
@@ -1273,15 +1273,23 @@ def _standings_table_html(rows: list[Any]) -> str:
 
 
 def _compact_result_html(result: MatchResult) -> str:
-    score = _score_text(result.goals_a_real, result.goals_b_real)
+    has_final = (
+        is_knockout_phase(result.phase)
+        and result.final_goals_a is not None
+        and result.final_goals_b is not None
+    )
+    score = _score_text(
+        result.goals_a_real,
+        result.goals_b_real,
+    )
     kickoff = result.kickoff_at.strftime("%Y-%m-%d %H:%M") if result.kickoff_at else "Horario por definir"
     source = escape(result.source or "Automatico")
     qualifier = f"Clasifica {result.qualified_team}" if result.qualified_team else source
     extra = ""
-    if result.final_goals_a is not None and result.final_goals_b is not None and (
+    if has_final and (
         result.final_goals_a != result.goals_a_real or result.final_goals_b != result.goals_b_real
     ):
-        extra += f" | Final {result.final_goals_a}-{result.final_goals_b}"
+        extra += f" | 120 min {result.final_goals_a}-{result.final_goals_b}"
     if result.penalties_a is not None and result.penalties_b is not None:
         extra += f" | Penales {result.penalties_a}-{result.penalties_b}"
     return (

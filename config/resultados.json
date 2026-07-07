@@ -4,6 +4,7 @@
   "result_first_check_minutes_after_expected_end": 5,
   "result_retry_minutes": 10,
   "result_timeout_hours_after_kickoff": 24,
+  "knockout_result_refresh_hours_after_kickoff": 72,
   "group_stage_expected_minutes": 120,
   "knockout_expected_minutes": 180,
   "standings": {

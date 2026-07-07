@@ -82,7 +82,12 @@ def should_check_result(match: MatchResult, cfg: dict, at=None) -> bool:
         return False
     expected_minutes = cfg["knockout_expected_minutes"] if _is_knockout(match.phase) else cfg["group_stage_expected_minutes"]
     first_check = match.kickoff_at + timedelta(minutes=expected_minutes + cfg["result_first_check_minutes_after_expected_end"])
-    timeout = match.kickoff_at + timedelta(hours=cfg["result_timeout_hours_after_kickoff"])
+    timeout_hours = (
+        cfg.get("knockout_result_refresh_hours_after_kickoff", cfg["result_timeout_hours_after_kickoff"])
+        if _is_knockout(match.phase)
+        else cfg["result_timeout_hours_after_kickoff"]
+    )
+    timeout = match.kickoff_at + timedelta(hours=timeout_hours)
     return first_check <= at <= timeout
 
 
@@ -226,8 +231,12 @@ def _parse_espn_event(event: dict, source: str, url: str) -> MatchResult | None:
     has_extra_time = status_period > 2 or len(home_periods) > 2 or len(away_periods) > 2
     home_from_events = _regulation_score_from_details(competition, home)
     away_from_events = _regulation_score_from_details(competition, away)
+    home_final_from_events = _final_score_from_details(competition, home)
+    away_final_from_events = _final_score_from_details(competition, away)
     home_regulation = home_from_events if home_from_events is not None else sum(home_periods[:2]) if len(home_periods) >= 2 else home_total
     away_regulation = away_from_events if away_from_events is not None else sum(away_periods[:2]) if len(away_periods) >= 2 else away_total
+    home_final = home_final_from_events if home_final_from_events is not None else sum(home_periods) if home_periods else home_total
+    away_final = away_final_from_events if away_final_from_events is not None else sum(away_periods) if away_periods else away_total
     penalties_a = _to_int(home.get("shootoutScore"))
     penalties_b = _to_int(away.get("shootoutScore"))
     qualified = next(
@@ -249,8 +258,8 @@ def _parse_espn_event(event: dict, source: str, url: str) -> MatchResult | None:
         source=source,
         source_url=url,
         confirmed=True,
-        final_goals_a=home_total,
-        final_goals_b=away_total,
+        final_goals_a=home_final,
+        final_goals_b=away_final,
         penalties_a=penalties_a,
         penalties_b=penalties_b,
         qualified_team=qualified,
@@ -337,6 +346,26 @@ def _regulation_score_from_details(competition: dict[str, Any], competitor: dict
         and detail.get("shootout") is not True
         and (_to_int(detail.get("clock", {}).get("value")) or 0) <= 90 * 60
         and str(detail.get("team", {}).get("id", "")) == team_id
+    )
+
+
+def _final_score_from_details(competition: dict[str, Any], competitor: dict[str, Any]) -> int | None:
+    details = competition.get("details")
+    if not isinstance(details, list):
+        return None
+    scoring_plays = [
+        detail for detail in details
+        if detail.get("scoringPlay") is True and detail.get("shootout") is not True
+    ]
+    if not scoring_plays:
+        return None
+    team_id = str(competitor.get("team", {}).get("id", ""))
+    if not team_id:
+        return None
+    return sum(
+        _to_int(detail.get("scoreValue")) or 0
+        for detail in scoring_plays
+        if str(detail.get("team", {}).get("id", "")) == team_id
     )
 
 

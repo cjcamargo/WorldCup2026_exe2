@@ -8,8 +8,8 @@ POINTS = {
     "team_goals": 1,
     "goal_difference": 1,
     "champion": 18,
-    "runner_up": 15,
-    "third_place": 12,
+    "runner_up": 9,
+    "third_place": 5,
     "group_first": 5,
     "group_second": 3,
     "group_third": 2,
@@ -54,9 +54,9 @@ def test_final_picks_score_separately():
         {"champion": "Brazil", "runner_up": "Argentina", "third_place": "Colombia"},
         POINTS,
     )
-    assert ranking[0]["points"] == 30
+    assert ranking[0]["points"] == 23
     assert detail[0]["champion_points"] == 18
-    assert detail[0]["third_place_points"] == 12
+    assert detail[0]["third_place_points"] == 5
 
 
 def test_group_top_three_scores_exact_positions_only():
