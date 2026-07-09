@@ -32,6 +32,9 @@ def test_knockout_calendar_has_all_32_matches_and_bogota_times():
     assert matches[0].team_a == "South Africa"
     assert matches[0].team_b == "Canada"
     assert matches[0].kickoff_at.isoformat() == "2026-06-28T14:00:00-05:00"
+    by_id = {match.match_id: match for match in matches}
+    assert by_id["M089"].kickoff_at.isoformat() == "2026-07-04T16:00:00-05:00"
+    assert by_id["M104"].kickoff_at.isoformat() == "2026-07-19T14:00:00-05:00"
     assert matches[-1].team_a == "Winner M101"
     assert matches[-1].team_b == "Winner M102"
 
